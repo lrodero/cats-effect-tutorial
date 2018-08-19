@@ -7,7 +7,7 @@ import cats.implicits._
 import java.io._
 import java.net._
 
-object StoppableServer2 extends IOApp {
+object StoppableServerFinal extends IOApp {
 
   def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
   

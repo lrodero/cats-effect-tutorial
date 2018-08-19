@@ -6,7 +6,7 @@ import cats.implicits._
 import java.io._
 import java.net._
 
-object Server extends IOApp {
+object SimpleServer extends IOApp {
 
   def echoProtocol(clientSocket: Socket): IO[Unit] = {
   

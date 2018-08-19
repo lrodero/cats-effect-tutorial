@@ -408,7 +408,7 @@ import cats.implicits._
 import java.io._
 import java.net._
 
-object Server extends IOApp {
+object SimpleServer extends IOApp {
 
   def echoProtocol(clientSocket: Socket): IO[Unit] = {
   
@@ -472,7 +472,7 @@ object Server extends IOApp {
 As before you can run in for example from the `sbt` console just by typing
  
 ```scala
-> runMain tutorial.Server
+> runMain tutorial.SimpleServer
 ```
 
 That will start the server on port `5432`, you can set any other port by

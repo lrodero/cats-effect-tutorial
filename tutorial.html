@@ -43,6 +43,7 @@ code > span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Ann
 code > span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
 code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
   </style>
+  <link rel="stylesheet" href="pandoc.css" type="text/css" />
 </head>
 <body>
 <h1 id="cats-effect-tutorial">Cats-effect tutorial</h1>
@@ -76,8 +77,8 @@ scalacOptions ++= Seq(
 
 <span class="kw">import</span> java.<span class="fu">io</span>._
 
-<span class="kw">val</span> in: IO[InputStream]  = IO{ <span class="kw">new</span> BufferedInputStream(<span class="kw">new</span> FileInputStream(origin)) }
-<span class="kw">val</span> out:IO[OutputStream] = IO{ <span class="kw">new</span> BufferedOutputStream(<span class="kw">new</span> FileOutputStream(destination)) }</code></pre></div>
+<span class="kw">val</span> inIO: IO[InputStream]  = IO{ <span class="kw">new</span> BufferedInputStream(<span class="kw">new</span> FileInputStream(origin)) }
+<span class="kw">val</span> outIO:IO[OutputStream] = IO{ <span class="kw">new</span> BufferedOutputStream(<span class="kw">new</span> FileOutputStream(destination)) }</code></pre></div>
 <p>We want to ensure that once we are done copying both streams are close. For that we will use <code>bracket</code>. There are three stages when using <code>bracket</code>: resource adquisition, usage, and release. Thus we define our <code>copy</code> function as follows:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="co">// From now on we assume these three imports to be present in all code snippets</span>
 <span class="kw">import</span> cats.<span class="fu">effect</span>.<span class="fu">IO</span>
@@ -85,10 +86,10 @@ scalacOptions ++= Seq(
 <span class="kw">import</span> java.<span class="fu">io</span>._ 
 
 <span class="kw">def</span> <span class="fu">copy</span>(origin: File, destination: File): IO[Long] = {
-  <span class="kw">val</span> in: IO[InputStream]  = IO{ <span class="kw">new</span> BufferedInputStream(<span class="kw">new</span> FileInputStream(origin)) }
-  <span class="kw">val</span> out:IO[OutputStream] = IO{ <span class="kw">new</span> BufferedOutputStream(<span class="kw">new</span> FileOutputStream(destination)) }
+  <span class="kw">val</span> inIO: IO[InputStream]  = IO{ <span class="kw">new</span> BufferedInputStream(<span class="kw">new</span> FileInputStream(origin)) }
+  <span class="kw">val</span> outIO:IO[OutputStream] = IO{ <span class="kw">new</span> BufferedOutputStream(<span class="kw">new</span> FileOutputStream(destination)) }
 
-  (in, out)                  <span class="co">// Stage 1: Getting resources </span>
+  (inIO, outIO)              <span class="co">// Stage 1: Getting resources </span>
     .<span class="fu">tupled</span>                  <span class="co">// From (IO[InputStream], IO[OutputStream]) to IO[(InputStream, OutputStream)]</span>
     .<span class="fu">bracket</span>{
       <span class="kw">case</span> (in, out) =&gt;
@@ -102,23 +103,17 @@ scalacOptions ++= Seq(
 }</code></pre></div>
 <p>So far so good, we have our streams ready to go! And in a safe manner too, as the <code>bracket</code> construct ensures they are closed no matter what. Note that any possible error raised when closing is 'swallowed' by the <code>handleErrorWith</code> call, which in the code above basically ignores the error cause. Not elegant, but enough for this example. Anyway in the real world there would be little else to do save maybe showing a warning message. Finally we chain the closing action using <code>*&gt;</code> call to return an <code>IO.unit</code> after closing (note that <code>*&gt;</code> is like using <code>flatMap</code> but the second step does not need as input the output from the first).</p>
 <p>By <code>bracket</code> contract the action happens in what we have called <em>Stage 2</em>, where given the resources we must return an <code>IO</code> instance that perform the task at hand.</p>
-<p>For the sake of clarity, the actual construction of that <code>IO</code> will be done by a different function, <code>transfer</code>. That <code>IO</code> encapsulates a loop that at each iteration will read a <em>batch</em> from the input stream to an array, and then write the data read to the output stream. Prior to create that function we will create another <code>transmit</code> function that simply moves data from an stream to another using an array as data buffer:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">transmit</span>(origin: InputStream, destination: OutputStream, buffer: Array[Byte]): IO[Int] =
+<p>For the sake of clarity, the actual construction of that <code>IO</code> will be done by a different function. First we will create a <code>transmit</code> function that simply moves data from an stream to another using an array as data buffer:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">transmit</span>(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
   <span class="kw">for</span> {
+    _      &lt;- IO.<span class="fu">cancelBoundary</span> <span class="co">// Cancelable at each iteration</span>
     amount &lt;- IO{ origin.<span class="fu">read</span>(buffer, <span class="dv">0</span>, buffer.<span class="fu">size</span>) }
-    _      &lt;- <span class="kw">if</span>(amount &gt; <span class="dv">-1</span>) IO { destination.<span class="fu">write</span>(buffer, <span class="dv">0</span>, amount) }
-              <span class="kw">else</span> IO.<span class="fu">unit</span> <span class="co">// End of read stream reached (by java.io.InputStream contract), nothing to write</span>
-  } <span class="kw">yield</span> amount <span class="co">// Returns the actual amount of bytes transmitted</span></code></pre></div>
-<p>Note that both input and output actions are encapsulated in their own <code>IO</code> instances. Being <code>IO</code> a monad we concatenate them using a for-comprehension to create another <code>IO</code>. Now, with <code>transmit</code> we can built the transmission loop in its own function:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">transmitLoop</span>(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
-  <span class="kw">for</span> {
-    _      &lt;- IO.<span class="fu">cancelBoundary</span>                     <span class="co">// Cancelable at each iteration</span>
-    amount &lt;- <span class="fu">transmit</span>(origin, destination, buffer) <span class="co">// Make the actual transfer</span>
-    total  &lt;- <span class="kw">if</span>(amount &gt; <span class="dv">-1</span>) <span class="fu">transmitLoop</span>(origin, destination, buffer, acc + amount) <span class="co">// Stack safe!</span>
-              <span class="kw">else</span> IO.<span class="fu">pure</span>(acc)                     <span class="co">// Negative &#39;amount&#39; signals end of input stream</span>
-  } <span class="kw">yield</span> total</code></pre></div>
-<p>There are several things to note in this function. First, the for-comprehension loops as long as the call to <code>transmit</code> does not return a negative value, by means of recursive calls. But <code>IO</code> is stack safe, so we are not concerned about stack overflow issues. At each iteration we increase the counter <code>acc</code> with the amount of bytes read at that iteration. Also, we introduce a call to <code>IO.cancelBoundary</code> as the first step of the loop. This is not mandatory for the actual transference of data we aim for. But it is a good policy, as it marks where the <code>IO</code> evaluation will be stopped (cancelled) if requested. In this case, at each iteration.</p>
-<p>So far so good! We are almost there, we only need to allocate the buffer that will be used for moving data around. It could have been created by <code>transmitLoop</code> itself but then we would need to refactor the function to prevent creating a new array at each iteration. That will be done by our <code>transfer</code> function (by convenience we hardcode the buffer size to 10KBs, but that can be made configurable easily):</p>
+    total  &lt;- <span class="kw">if</span>(amount &gt; <span class="dv">-1</span>) IO { destination.<span class="fu">write</span>(buffer, <span class="dv">0</span>, amount) } *&gt; <span class="fu">transmit</span>(origin, destination, buffer, acc + amount)
+              <span class="kw">else</span> IO.<span class="fu">pure</span>(acc) <span class="co">// End of read stream reached (by java.io.InputStream contract), nothing to write</span>
+  } <span class="kw">yield</span> total <span class="co">// Returns the actual amount of bytes transmitted</span></code></pre></div>
+<p>Note that both input and output actions are encapsulated in their own <code>IO</code> instances. Being <code>IO</code> a monad we concatenate them using a for-comprehension to create another <code>IO</code>.</p>
+<p>There are several things to note in this function. First, the for-comprehension loops as long as the call to <code>read()</code> does not return a negative value, by means of recursive calls. But <code>IO</code> is stack safe, so we are not concerned about stack overflow issues. At each iteration we increase the counter <code>acc</code> with the amount of bytes read at that iteration. Also, we introduce a call to <code>IO.cancelBoundary</code> as the first step of the loop. This is not mandatory for the actual transference of data we aim for. But it is a good policy, as it marks where the <code>IO</code> evaluation will be stopped (cancelled) if requested. In this case, at each iteration.</p>
+<p>So far so good! We are almost there, we only need to allocate the buffer that will be used for moving data around. It could have been created by <code>transmit</code> itself but then we would need to refactor the function to prevent creating a new array at each iteration. That will be done by a new <code>transfer</code> function (by convenience we hardcode the buffer size to 10KBs, but that can be made configurable easily):</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">transfer</span>(origin: InputStream, destination: OutputStream): IO[Long] =
   <span class="kw">for</span> {
     buffer &lt;- IO{ <span class="kw">new</span> Array[Byte](<span class="dv">1024</span> * <span class="dv">10</span>) } <span class="co">// Allocated only when the IO is evaluated</span>
@@ -131,22 +126,15 @@ scalacOptions ++= Seq(
 <span class="kw">import</span> cats.<span class="fu">implicits</span>._ 
 <span class="kw">import</span> java.<span class="fu">io</span>._ 
 
-<span class="kw">object</span> Main <span class="kw">extends</span> IOApp {
+<span class="kw">object</span> CopyFile <span class="kw">extends</span> IOApp {
 
-  <span class="kw">def</span> <span class="fu">transmit</span>(origin: InputStream, destination: OutputStream, buffer: Array[Byte]): IO[Int] =
+  <span class="kw">def</span> <span class="fu">transmit</span>(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
     <span class="kw">for</span> {
+      _      &lt;- IO.<span class="fu">cancelBoundary</span> <span class="co">// Cancelable at each iteration</span>
       amount &lt;- IO{ origin.<span class="fu">read</span>(buffer, <span class="dv">0</span>, buffer.<span class="fu">size</span>) }
-      _      &lt;- <span class="kw">if</span>(amount &gt; <span class="dv">-1</span>) IO { destination.<span class="fu">write</span>(buffer, <span class="dv">0</span>, amount) }
-                <span class="kw">else</span> IO.<span class="fu">unit</span> <span class="co">// End of read stream reached (by java.io.InputStream contract), nothing to write</span>
-    } <span class="kw">yield</span> amount <span class="co">// Returns the actual amount of bytes transmitted</span>
-
-  <span class="kw">def</span> <span class="fu">transmitLoop</span>(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
-    <span class="kw">for</span> {
-      _      &lt;- IO.<span class="fu">cancelBoundary</span>                     <span class="co">// Cancelable at each iteration</span>
-      amount &lt;- <span class="fu">transmit</span>(origin, destination, buffer) <span class="co">// Make the actual transfer (our previous function)</span>
-      total  &lt;- <span class="kw">if</span>(amount &gt; <span class="dv">-1</span>) <span class="fu">transmitLoop</span>(origin, destination, buffer, acc + amount) <span class="co">// Stack safe!</span>
-                <span class="kw">else</span> IO.<span class="fu">pure</span>(acc)                     <span class="co">// Negative &#39;amount&#39; signals end of input stream</span>
-    } <span class="kw">yield</span> total
+      total  &lt;- <span class="kw">if</span>(amount &gt; <span class="dv">-1</span>) IO { destination.<span class="fu">write</span>(buffer, <span class="dv">0</span>, amount) } *&gt; <span class="fu">transmit</span>(origin, destination, buffer, acc + amount)
+                <span class="kw">else</span> IO.<span class="fu">pure</span>(acc) <span class="co">// End of read stream reached (by java.io.InputStream contract), nothing to write</span>
+    } <span class="kw">yield</span> total <span class="co">// Returns the actual amount of bytes transmitted</span>
 
   <span class="kw">def</span> <span class="fu">transfer</span>(origin: InputStream, destination: OutputStream): IO[Long] =
     <span class="kw">for</span> {
@@ -155,10 +143,10 @@ scalacOptions ++= Seq(
     } <span class="kw">yield</span> acc
 
   <span class="kw">def</span> <span class="fu">copy</span>(origin: File, destination: File): IO[Long] = {
-    <span class="kw">val</span> in: IO[InputStream]  = IO{ <span class="kw">new</span> BufferedInputStream(<span class="kw">new</span> FileInputStream(origin)) }
-    <span class="kw">val</span> out:IO[OutputStream] = IO{ <span class="kw">new</span> BufferedOutputStream(<span class="kw">new</span> FileOutputStream(destination)) }
+    <span class="kw">val</span> inIO: IO[InputStream]  = IO{ <span class="kw">new</span> BufferedInputStream(<span class="kw">new</span> FileInputStream(origin)) }
+    <span class="kw">val</span> outIO:IO[OutputStream] = IO{ <span class="kw">new</span> BufferedOutputStream(<span class="kw">new</span> FileOutputStream(destination)) }
 
-    (in, out)                  <span class="co">// Stage 1: Getting resources </span>
+    (inIO, outIO)              <span class="co">// Stage 1: Getting resources </span>
       .<span class="fu">tupled</span>                  <span class="co">// From (IO[InputStream], IO[OutputStream]) to IO[(InputStream, OutputStream)]</span>
       .<span class="fu">bracket</span>{
         <span class="kw">case</span> (in, out) =&gt;
@@ -184,7 +172,7 @@ scalacOptions ++= Seq(
 
 }</code></pre></div>
 <p>You can run this code from <code>sbt</code> just by issuing this call:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">&gt; runMain tutorial.<span class="fu">Main</span></code></pre></div>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">&gt; runMain tutorial.<span class="fu">CopyFile</span></code></pre></div>
 <h2 id="exercises">Exercises</h2>
 <p>To finalize we propose you some exercises that will help you to keep improving your IO-kungfu:</p>
 <ol style="list-style-type: decimal">
@@ -221,8 +209,10 @@ scalacOptions ++= Seq(
 
   <span class="kw">def</span> <span class="fu">loop</span>(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = ???
 
-  (IO{ <span class="kw">new</span> BufferedReader(<span class="kw">new</span> InputStreamReader(clientSocket.<span class="fu">getInputStream</span>())) },
-   IO{ <span class="kw">new</span> BufferedWriter(<span class="kw">new</span> PrintWriter(clientSocket.<span class="fu">getOutputStream</span>())) })
+  <span class="kw">val</span> readerIO = IO{ <span class="kw">new</span> BufferedReader(<span class="kw">new</span> InputStreamReader(clientSocket.<span class="fu">getInputStream</span>())) }
+  <span class="kw">val</span> writerIO = IO{ <span class="kw">new</span> BufferedWriter(<span class="kw">new</span> PrintWriter(clientSocket.<span class="fu">getOutputStream</span>())) }
+
+  (readerIO, writerIO)
     .<span class="fu">tupled</span>       <span class="co">// From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]</span>
     .<span class="fu">bracket</span> {
       <span class="kw">case</span> (reader, writer) =&gt; <span class="fu">loop</span>(reader, writer)  <span class="co">// Let&#39;s get to work!</span>
@@ -279,7 +269,7 @@ scalacOptions ++= Seq(
 <span class="kw">import</span> java.<span class="fu">io</span>._
 <span class="kw">import</span> java.<span class="fu">net</span>._
 
-<span class="kw">object</span> Server <span class="kw">extends</span> IOApp {
+<span class="kw">object</span> SimpleServer <span class="kw">extends</span> IOApp {
 
   <span class="kw">def</span> <span class="fu">echoProtocol</span>(clientSocket: Socket): IO[Unit] = {
   
@@ -299,8 +289,10 @@ scalacOptions ++= Seq(
                 }
       } <span class="kw">yield</span> ()
   
-    (IO{ <span class="kw">new</span> BufferedReader(<span class="kw">new</span> InputStreamReader(clientSocket.<span class="fu">getInputStream</span>())) },
-     IO{ <span class="kw">new</span> BufferedWriter(<span class="kw">new</span> PrintWriter(clientSocket.<span class="fu">getOutputStream</span>())) })
+    <span class="kw">val</span> readerIO = IO{ <span class="kw">new</span> BufferedReader(<span class="kw">new</span> InputStreamReader(clientSocket.<span class="fu">getInputStream</span>())) }
+    <span class="kw">val</span> writerIO = IO{ <span class="kw">new</span> BufferedWriter(<span class="kw">new</span> PrintWriter(clientSocket.<span class="fu">getOutputStream</span>())) }
+  
+    (readerIO, writerIO)
       .<span class="fu">tupled</span>       <span class="co">// From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]</span>
       .<span class="fu">bracket</span> {
         <span class="kw">case</span> (reader, writer) =&gt; <span class="fu">loop</span>(reader, writer)  <span class="co">// Let&#39;s get to work!</span>
@@ -337,7 +329,7 @@ scalacOptions ++= Seq(
   }
 }</code></pre></div>
 <p>As before you can run in for example from the <code>sbt</code> console just by typing</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">&gt; runMain tutorial.<span class="fu">Server</span></code></pre></div>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">&gt; runMain tutorial.<span class="fu">SimpleServer</span></code></pre></div>
 <p>That will start the server on port <code>5432</code>, you can set any other port by passing it as argument. To test the server is properly running, you can connect to it using <code>telnet</code>. Here we connect, send <code>hi</code> line to check we get the same line as reply, and then send and empty line to close the connection:</p>
 <pre class="console"><code>$ telnet localhost 5432
 Trying 127.0.0.1...
@@ -435,9 +427,11 @@ Connection closed by foreign host.</code></pre>
                   <span class="kw">case</span> _      =&gt; IO{ writer.<span class="fu">write</span>(line); writer.<span class="fu">newLine</span>(); writer.<span class="fu">flush</span>() } *&gt; <span class="fu">loop</span>(reader, writer)
                 }
       } <span class="kw">yield</span> ()
+
+    <span class="kw">val</span> readerIO = IO{ <span class="kw">new</span> BufferedReader(<span class="kw">new</span> InputStreamReader(clientSocket.<span class="fu">getInputStream</span>())) }
+    <span class="kw">val</span> writerIO = IO{ <span class="kw">new</span> BufferedWriter(<span class="kw">new</span> PrintWriter(clientSocket.<span class="fu">getOutputStream</span>())) }
   
-    (IO{ <span class="kw">new</span> BufferedReader(<span class="kw">new</span> InputStreamReader(clientSocket.<span class="fu">getInputStream</span>())) },
-     IO{ <span class="kw">new</span> BufferedWriter(<span class="kw">new</span> PrintWriter(clientSocket.<span class="fu">getOutputStream</span>())) })
+    (readerIO, writerIO)
       .<span class="fu">tupled</span>       <span class="co">// From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]</span>
       .<span class="fu">bracket</span> {
         <span class="kw">case</span> (reader, writer) =&gt; <span class="fu">loop</span>(reader, writer)  <span class="co">// Let&#39;s get to work!</span>
@@ -526,7 +520,7 @@ Connection closed by foreign host.</code></pre>
     }
   } <span class="kw">yield</span> ()
   }</code></pre></div>
-<p>But note that will close the client socket, which will raise an exception in the <code>reader.readLine()</code> call in the <code>loop</code> method of <code>echoProtocol</code>. As it happened before with the server socket, the exception will be shown as an ugly error message in the console. To prevent this we modify the <code>loop</code> function so it uses <code>attempt</code> to control possible errors. If some error is detected first the state of <code>stopFlag</code> is checked, and if it is set a graceful shutdown is assumed and no action is taken; otherwise the error is raised:</p>
+<p>But note that when client socket is closed an exception will be raised by the <code>reader.readLine()</code> call in the <code>loop</code> method of <code>echoProtocol</code>. As it happened before with the server socket, the exception will be shown as an ugly error message in the console. To prevent this we modify the <code>loop</code> function so it uses <code>attempt</code> to control possible errors. If some error is detected first the state of <code>stopFlag</code> is checked, and if it is set a graceful shutdown is assumed and no action is taken; otherwise the error is raised:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">loop</span>(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
   <span class="kw">for</span> {
     _     &lt;- IO.<span class="fu">cancelBoundary</span>
@@ -545,5 +539,9 @@ Connection closed by foreign host.</code></pre>
                  } <span class="kw">yield</span> ()
              }
   } <span class="kw">yield</span> ()</code></pre></div>
+<p>There are many other improvements that can be applied to this code, like for example modifying <code>serve</code> so instead of using a hardcoded call to <code>echoProtocol</code> it calls to some method passed as parameter. That way the same function could be used for any protocol! Signature would be something like:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">serve</span>(serverSocket: ServerSocket, protocol: (Socket, MVar[IO, Unit]) =&gt; IO[Unit], stopFlag: MVar[IO, Unit]): IO[Unit] = ???</code></pre></div>
+<p>After modifying <code>serve</code> code we would only need to change <code>server</code> so it includes the protocol to use in its call to <code>serve</code>.</p>
+<p>And what about trying to develop different protocols!?</p>
 </body>
 </html>

@@ -25,8 +25,10 @@ object Server extends IOApp {
               }
     } yield ()
   
-    (IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) },
-     IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) })
+    val readerIO = IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) }
+    val writerIO = IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) }
+  
+    (readerIO, writerIO)
       .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
       .bracket {
         case (reader, writer) => loop(reader, writer)  // Let's get to work!

@@ -66,8 +66,8 @@ import cats.effect.IO
 
 import java.io._
 
-val in: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
-val out:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
+val inIO: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
+val outIO:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
 ```
 
 We want to ensure that once we are done copying both streams are close. For
@@ -82,10 +82,10 @@ import cats.implicits._
 import java.io._ 
 
 def copy(origin: File, destination: File): IO[Long] = {
-  val in: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
-  val out:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
+  val inIO: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
+  val outIO:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
 
-  (in, out)                  // Stage 1: Getting resources 
+  (inIO, outIO)              // Stage 1: Getting resources 
     .tupled                  // From (IO[InputStream], IO[OutputStream]) to IO[(InputStream, OutputStream)]
     .bracket{
       case (in, out) =>
@@ -204,10 +204,10 @@ object Main extends IOApp {
     } yield acc
 
   def copy(origin: File, destination: File): IO[Long] = {
-    val in: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
-    val out:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
+    val inIO: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
+    val outIO:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
 
-    (in, out)                  // Stage 1: Getting resources 
+    (inIO, outIO)              // Stage 1: Getting resources 
       .tupled                  // From (IO[InputStream], IO[OutputStream]) to IO[(InputStream, OutputStream)]
       .bracket{
         case (in, out) =>
@@ -324,8 +324,10 @@ def echoProtocol(clientSocket: Socket): IO[Unit] = {
 
   def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = ???
 
-  (IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) },
-   IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) })
+  val readerIO = IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) }
+  val writerIO = IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) }
+
+  (readerIO, writerIO)
     .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
     .bracket {
       case (reader, writer) => loop(reader, writer)  // Let's get to work!
@@ -446,8 +448,10 @@ object Server extends IOApp {
                 }
       } yield ()
   
-    (IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) },
-     IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) })
+    val readerIO = IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) }
+    val writerIO = IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) }
+  
+    (readerIO, writerIO)
       .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
       .bracket {
         case (reader, writer) => loop(reader, writer)  // Let's get to work!
@@ -644,9 +648,11 @@ object StoppableServer extends IOApp {
                   case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
                 }
       } yield ()
+
+    val readerIO = IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) }
+    val writerIO = IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) }
   
-    (IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) },
-     IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) })
+    (readerIO, writerIO)
       .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
       .bracket {
         case (reader, writer) => loop(reader, writer)  // Let's get to work!

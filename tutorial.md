@@ -114,38 +114,25 @@ where given the resources we must return an `IO` instance that perform the task
 at hand.
 
 For the sake of clarity, the actual construction of that `IO` will be done by a
-different function, `transfer`. That `IO` encapsulates a loop that at each
-iteration will read a _batch_ from the input stream to an array, and then write
-the data read to the output stream. Prior to create that function we will
-create another `transmit` function that simply moves data from an stream to
-another using an array as data buffer:
+different function. First we will create a `transmit` function that simply moves
+data from an stream to another using an array as data buffer:
 
 ```scala
-def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte]): IO[Int] =
+def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
   for {
+    _      <- IO.cancelBoundary // Cancelable at each iteration
     amount <- IO{ origin.read(buffer, 0, buffer.size) }
-    _      <- if(amount > -1) IO { destination.write(buffer, 0, amount) }
-              else IO.unit // End of read stream reached (by java.io.InputStream contract), nothing to write
-  } yield amount // Returns the actual amount of bytes transmitted
+    total  <- if(amount > -1) IO { destination.write(buffer, 0, amount) } *> transmit(origin, destination, buffer, acc + amount)
+              else IO.pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
+  } yield total // Returns the actual amount of bytes transmitted
 ```
 
 Note that both input and output actions are encapsulated in their own `IO`
 instances. Being `IO` a monad we concatenate them using a for-comprehension to
-create another `IO`. Now, with `transmit` we can built the transmission loop in
-its own function:
-
-```scala
-def transmitLoop(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
-  for {
-    _      <- IO.cancelBoundary                     // Cancelable at each iteration
-    amount <- transmit(origin, destination, buffer) // Make the actual transfer
-    total  <- if(amount > -1) transmitLoop(origin, destination, buffer, acc + amount) // Stack safe!
-              else IO.pure(acc)                     // Negative 'amount' signals end of input stream
-  } yield total
-```
+create another `IO`.
 
 There are several things to note in this function. First, the for-comprehension
-loops as long as the call to `transmit` does not return a negative value, by
+loops as long as the call to `read()` does not return a negative value, by
 means of recursive calls. But `IO` is stack safe, so we are not concerned about
 stack overflow issues. At each iteration we increase the counter `acc` with the
 amount of bytes read at that iteration.  Also, we introduce a call to
@@ -156,8 +143,8 @@ this case, at each iteration.
 
 So far so good! We are almost there, we only need to allocate the buffer that
 will be used for moving data around. It could have been created by
-`transmitLoop` itself but then we would need to refactor the function to
-prevent creating a new array at each iteration. That will be done by our
+`transmit` itself but then we would need to refactor the function to
+prevent creating a new array at each iteration. That will be done by a new
 `transfer` function (by convenience we hardcode the buffer size to 10KBs, but
 that can be made configurable easily):
 
@@ -180,22 +167,15 @@ import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._ 
 import java.io._ 
 
-object Main extends IOApp {
+object CopyFile extends IOApp {
 
-  def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte]): IO[Int] =
+  def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
     for {
+      _      <- IO.cancelBoundary // Cancelable at each iteration
       amount <- IO{ origin.read(buffer, 0, buffer.size) }
-      _      <- if(amount > -1) IO { destination.write(buffer, 0, amount) }
-                else IO.unit // End of read stream reached (by java.io.InputStream contract), nothing to write
-    } yield amount // Returns the actual amount of bytes transmitted
-
-  def transmitLoop(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
-    for {
-      _      <- IO.cancelBoundary                     // Cancelable at each iteration
-      amount <- transmit(origin, destination, buffer) // Make the actual transfer (our previous function)
-      total  <- if(amount > -1) transmitLoop(origin, destination, buffer, acc + amount) // Stack safe!
-                else IO.pure(acc)                     // Negative 'amount' signals end of input stream
-    } yield total
+      total  <- if(amount > -1) IO { destination.write(buffer, 0, amount) } *> transmit(origin, destination, buffer, acc + amount)
+                else IO.pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
+    } yield total // Returns the actual amount of bytes transmitted
 
   def transfer(origin: InputStream, destination: OutputStream): IO[Long] =
     for {
@@ -237,7 +217,7 @@ object Main extends IOApp {
 You can run this code from `sbt` just by issuing this call:
 
 ```scala
-> runMain tutorial.Main
+> runMain tutorial.CopyFile
 ```
 
 Exercises
@@ -769,13 +749,13 @@ def serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
   }
 ```
 
-But note that will close the client socket, which will raise an exception in
-the `reader.readLine()` call in the `loop` method of `echoProtocol`. As it
-happened before with the server socket, the exception will be shown as an ugly
-error message in the console. To prevent this we modify the `loop` function so
-it uses `attempt` to control possible errors. If some error is detected first
-the state of `stopFlag` is checked, and if it is set a graceful shutdown is
-assumed and no action is taken; otherwise the error is raised:
+But note that when client socket is closed an exception will be raised by the
+`reader.readLine()` call in the `loop` method of `echoProtocol`. As it happened
+before with the server socket, the exception will be shown as an ugly error
+message in the console. To prevent this we modify the `loop` function so it uses
+`attempt` to control possible errors. If some error is detected first the state
+of `stopFlag` is checked, and if it is set a graceful shutdown is assumed and no
+action is taken; otherwise the error is raised:
 
 ```scala
 def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
@@ -797,3 +777,17 @@ def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
              }
   } yield ()
 ```
+
+There are many other improvements that can be applied to this code, like for
+example modifying `serve` so instead of using a hardcoded call to `echoProtocol`
+it calls to some method passed as parameter. That way the same function could be
+used for any protocol! Signature would be something like:
+
+```scala
+def serve(serverSocket: ServerSocket, protocol: (Socket, MVar[IO, Unit]) => IO[Unit], stopFlag: MVar[IO, Unit]): IO[Unit] = ???
+```
+
+After modifying `serve` code we would only need to change `server` so it includes
+the protocol to use in its call to `serve`.
+
+And what about trying to develop different protocols!?

@@ -5,27 +5,20 @@ import cats.implicits._
 
 import java.io._ 
 
-object Main extends IOApp {
+object CopyFile extends IOApp {
 
-  def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte]): IO[Int] =
+  def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
     for {
+      _      <- IO.cancelBoundary // Cancelable at each iteration
       amount <- IO{ origin.read(buffer, 0, buffer.size) }
-      _      <- if(amount > -1) IO { destination.write(buffer, 0, amount) }
-                else IO.unit // End of read stream reached (by java.io.InputStream contract), nothing to write
-    } yield amount // Returns the actual amount of bytes transmitted
-
-  def transmitLoop(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
-    for {
-      _      <- IO.cancelBoundary                     // Cancelable at each iteration
-      amount <- transmit(origin, destination, buffer) // Make the actual transfer
-      total  <- if(amount > -1) transmitLoop(origin, destination, buffer, acc + amount) // Stack safe!
-                else IO.pure(acc)                     // Negative 'amount' signals end of input stream
-    } yield total
+      total  <- if(amount > -1) IO { destination.write(buffer, 0, amount) } *> transmit(origin, destination, buffer, acc + amount)
+                else IO.pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
+    } yield total // Returns the actual amount of bytes transmitted
 
   def transfer(origin: InputStream, destination: OutputStream): IO[Long] =
     for {
       buffer <- IO{ new Array[Byte](1024 * 10) } // Allocated only when the IO is evaluated
-      acc    <- transmitLoop(origin, destination, buffer, 0L)
+      acc    <- transmit(origin, destination, buffer, 0L)
     } yield acc
 
   def copy(origin: File, destination: File): IO[Long] = {

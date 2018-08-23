@@ -38,7 +38,7 @@ object StoppableServerFinal extends IOApp {
         lineE <- IO{ reader.readLine() }.attempt
         _     <- lineE match {
                    case Right(line) => line match {
-                     case "STOP" => stopFlag.put(()) // Returns IO[Unit], which is handy as we are done here
+                     case "STOP" => stopFlag.put(()) *> IO.shift // Returns IO[Unit], which is handy as we are done here
                      case ""     => IO.unit          // Empty line, we are done
                      case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
                    }
@@ -54,12 +54,15 @@ object StoppableServerFinal extends IOApp {
     val readerIO = IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) }
     val writerIO = IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) }
   
+    import cats.effect.ExitCase.{Completed, Error, Canceled}
     (readerIO, writerIO)
       .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
-      .bracket {
+      .bracketCase {
         case (reader, writer) => loop(reader, writer)  // Let's get to work!
       } {
-        case (reader, writer) => close(reader, writer) // We are done, closing the streams
+        case ((reader, writer), Completed) => IO{println(s"Client ${clientSocket.getPort} Completed")} *> close(reader, writer) // We are done, closing the streams
+        case ((reader, writer), Error(e)) => IO{println(s"Client ${clientSocket.getPort} Error ${e.getMessage}")} *> close(reader, writer) // We are done, closing the streams
+        case ((reader, writer), Canceled) => IO{println(s"Client ${clientSocket.getPort} Canceled")} *> close(reader, writer) // We are done, closing the streams
       }
   }
 
@@ -74,10 +77,12 @@ object StoppableServerFinal extends IOApp {
       _       <- socketE match {
         case Right(socket) =>
           for { // accept() succeeded, we attend the client in its own Fiber
-            fiber <- echoProtocol(socket, stopFlag)
-                       .guarantee(close(socket))     // We close the server whatever happens
+            fiber <- IO{println(s"New client at port ${socket.getPort}")} *> echoProtocol(socket, stopFlag)
+                       .guarantee{IO{println(s"Closing client socket ${socket.getPort}")} *> close(socket)}     // We close the server whatever happens
                        .start                        // Client attended by its own Fiber
-            _     <- (stopFlag.read *> fiber.cancel)
+            /*fiber <- IO.pure{socket}.bracket{socket => echoProtocol(socket, stopFlag)}{socket => IO{println("Closing client socket")} *> close(socket)}
+                       .start*/
+            _     <- (stopFlag.read *> IO{println(s"Canceling fiber for socket ${socket.getPort}")} *> close(socket) *> IO.shift)
                        .start                        // Another Fiber to cancel the client when stopFlag is set
             _     <- serve(serverSocket, stopFlag)   // Looping back to the beginning
           } yield ()
@@ -95,7 +100,7 @@ object StoppableServerFinal extends IOApp {
     for {
       stopFlag    <- MVar[IO].empty[Unit]
       serverFiber <- serve(serverSocket, stopFlag).start
-      _           <- stopFlag.read
+      _           <- stopFlag.read *> IO{println(s"Stopping server")}
       _           <- serverFiber.cancel
     } yield ExitCode.Success
 

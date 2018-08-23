@@ -26,7 +26,7 @@ version := "0.1"
 
 scalaVersion := "2.12.2"
 
-libraryDependencies += "org.typelevel" %% "cats-effect" % "1.0.0-RC2" withSources() withJavadoc()
+libraryDependencies += "org.typelevel" %% "cats-effect" % "1.0.0-RC3"
 
 scalacOptions ++= Seq(
   "-feature",
@@ -138,7 +138,7 @@ stack overflow issues. At each iteration we increase the counter `acc` with the
 amount of bytes read at that iteration.  Also, we introduce a call to
 `IO.cancelBoundary` as the first step of the loop. This is not mandatory for
 the actual transference of data we aim for. But it is a good policy, as it
-marks where the `IO` evaluation will be stopped (cancelled) if requested. In
+marks where the `IO` evaluation will be stopped (canceled) if requested. In
 this case, at each iteration.
 
 So far so good! We are almost there, we only need to allocate the buffer that
@@ -506,14 +506,20 @@ better mechanisms to stop them. In this section we use some other `cats-effect`
 constructs to deal with this.
 
 First, we will use a flag to signal when the server shall quit. The server will
-run on its own `Fiber`, that will be cancelled when that flag is set. The flag
+run on its own `Fiber`, that will be canceled when that flag is set. The flag
 will be an instance of `MVar`. The `cats-effect` documentation describes `MVar`
 as _a mutable location that can be empty or contains a value, asynchronously
 blocking reads when empty and blocking writes when full_. So we will 'block' by
-reading our `MVar` instance. And who shall signal that the server must be
-stopped? In this example, we will assume that it will be the connected users
-who can request the server to halt by sendind a `STOP` message. Thus, the
-method attending clients (`echoProtocol`!) needs access to the flag. 
+reading our `MVar` instance, and only writing when `STOP` is received, the write
+being the _signal_ that the server must be shut down. Another possible choice
+would be using `cats-effect`'s `Deferred`, but unlike `Deferred` `MVar` does
+allow to peek whether a value was written or not. As we shall see, this will
+come handy later on.
+
+And who shall signal that the server must be stopped? In this example, we will
+assume that it will be the connected users who can request the server to halt by
+sendind a `STOP` message. Thus, the method attending clients (`echoProtocol`!)
+needs access to the flag.
 
 Let's first define a new method `server` that instantiates the flag, runs the
 `serve` method in its own `Fiber` and waits on the flag to be set. Only when
@@ -714,7 +720,7 @@ Think about it: we have a `stopFlag` that signals when the server must be
 stopped. When that flag is set we can assume we shall close all client
 connections too. Thus  what we need to do is, every time we create a new
 `Fiber` to attend some new client, we must also make sure that when `stopFlag`
-is set that `Fiber` is cancelled. As `Fiber` instances are very light we can
+is set that `Fiber` is canceled. As `Fiber` instances are very light we can
 create a new instance just to wait for `stopFlag.read` and then cancelling the
 client's own `Fiber`. This is how the `serve` method will look like now with
 that change:

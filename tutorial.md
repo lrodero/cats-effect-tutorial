@@ -299,7 +299,6 @@ method will be in charge of closing those buffers, but not the client socket
 scaffolding:
 
 ```scala
-// From now on we assume these imports to be present in all code snippets
 import cats.effect._
 import cats.implicits._
 import java.io._
@@ -328,8 +327,8 @@ def echoProtocol(clientSocket: Socket): IO[Unit] = {
 }
 ```
 
-Note that we are using again `bracket` to ensure that the method closes the two
-streams it creates.  Also, all actions with potential side-effects are
+Realize that we are using again `bracket` to ensure that the method closes the
+two streams it creates.  Also, all actions with potential side-effects are
 encapsulated in `IO` instances. That way we ensure no side-effect is actually
 run until the `IO` returned by this method is evaluated. We could use as well
 `bracketCase` for a finer control of what actually caused the termination:
@@ -349,8 +348,8 @@ import cats.effect.Exitcase._
   }
 ```
 
-That is probably a good policy and you must be aware that possibility exists.
-But for the sake of clarity we will stick to the simpler `bracket`.
+That is a good policy and you must be aware that possibility exists.  But for
+the sake of clarity we will stick to the simpler `bracket` for this tutorial.
 
 Finally, and as we did in the previous example, we ignore possible errors when
 closing the streams, as there is little to do in such cases.  But, of course,
@@ -371,7 +370,7 @@ def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
 
 The loop tries to read a line from the client, and if successful then it checks
 the line content. If empty it finishes the method, if not it sends back the
-line through the writer and loops back to the beginning. Easy, right?
+line through the writer and loops back to the beginning. Easy, right :) ?
 
 So we are done with our `echoProtocol` method, good! But we still miss the part
 of our server that will list for new connections and create `Fiber`s to attend
@@ -396,7 +395,7 @@ def serve(serverSocket: ServerSocket): IO[Unit] = {
 ```
 
 To be honest, that wasn't that hard either, was it? We invoke the `accept()`
-method of the `ServerSocket` and when a new connection arrives we call the
+method of `ServerSocket` and when a new connection arrives we call the
 `echoProtocol` method we defined above to attend it. As client socket instances
 are created by this method, then it is in charge of closing them once
 `echoProtocol` has finished. We do this with the quite handy `guarantee` call,
@@ -404,7 +403,14 @@ that ensures that when the `IO` finishes the functionality inside `guarantee`
 is run whatever the outcome was. In this case we ensure closing the socket,
 ignoring any possible error when closing. Also quite interesting: we use
 `start`! By doing so the `echoProtocol` call will run on its own `Fiber` thus
-not blocking the main loop.
+not blocking the main loop. As in the previous example to copy files, we include
+a call to `IO.cancelBoundary` so we ensure the loop can be cancelled at each
+iteration. However let's not mix up this with Java thread `interrupt` or the
+like. Calling to `cancel` on a `Fiber` instance will not stop it immediately. So
+in the code above, if the fiber is waiting on `accept()` then `cancel()` would
+not 'unlock' the fiber. Instead the fiber will keep waiting for a connection.
+Only when the loop iterates again and the `cancelBoundary` is reached then the
+fiber will be effectively canceled.
 
 So, what do we miss now? Only the creation of the server socket of course,
 which we can already do in the `run` method of an `IOApp`. So our final server
@@ -426,18 +432,17 @@ object SimpleServer extends IOApp {
     def close(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
       (IO{reader.close()}, IO{writer.close()})
         .tupled                        // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
-        .map(_ => ())                  // From IO[(Unit, Unit)] to IO[Unit]
+        .map(_ => ())                  // From IO[(Unit, Unit)] IO[Unit]
         .handleErrorWith(_ => IO.unit) // Swallowing up any possible error
   
-    def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
-      for {
-        _    <- IO.cancelBoundary
-        line <- IO{ reader.readLine() }
-        _    <- line match {
-                  case "" => IO.unit // Empty line, we are done
-                  case _  => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
-                }
-      } yield ()
+    def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = for {
+      _    <- IO.cancelBoundary
+      line <- IO{ reader.readLine() }
+      _    <- line match {
+                case "" => IO.unit // Empty line, we are done
+                case _  => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
+              }
+    } yield ()
   
     val readerIO = IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) }
     val writerIO = IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) }
@@ -486,10 +491,10 @@ As before you can run in for example from the `sbt` console just by typing
 > runMain tutorial.SimpleServer
 ```
 
-That will start the server on port `5432`, you can set any other port by
-passing it as argument. To test the server is properly running, you can connect
-to it using `telnet`. Here we connect, send `hi` line to check we get the same
-line as reply, and then send and empty line to close the connection:
+That will start the server on default port `5432`, you can also set any other
+port by passing it as argument. To test the server is properly running, you can
+connect to it using `telnet`. Here we connect, send `hi` line to check we get
+the same line as reply, and then send and empty line to close the connection:
 
 ```console
 $ telnet localhost 5432
@@ -505,9 +510,10 @@ Connection closed by foreign host.
 You can connect several telnet sessions at the same time to verify that indeed
 our server can attend all of them simultaneously.
 
-Unfortunately this server is a bit too simplistic. What about halting? Well,
-that is something we have not addressed yet and it is when things can get a bit
-more complicated. We will deal with proper server halting in the next section.
+Unfortunately this server is a bit too simplistic. For example, how can we stop
+it? Well, that is something we have not addressed yet and it is when things can
+get a bit more complicated. We will deal with proper server halting in the next
+section.
 
 Handling exit events in echo server
 -----------------------------------
@@ -520,12 +526,26 @@ First, we will use a flag to signal when the server shall quit. The server will
 run on its own `Fiber`, that will be canceled when that flag is set. The flag
 will be an instance of `MVar`. The `cats-effect` documentation describes `MVar`
 as _a mutable location that can be empty or contains a value, asynchronously
-blocking reads when empty and blocking writes when full_. So we will 'block' by
-reading our `MVar` instance, and only writing when `STOP` is received, the write
-being the _signal_ that the server must be shut down. Another possible choice
-would be using `cats-effect`'s `Deferred`, but unlike `Deferred` `MVar` does
-allow to peek whether a value was written or not. As we shall see, this will
-come handy later on.
+blocking reads when empty and blocking writes when full_. That is what we need,
+the hability to block! So we will 'block' by reading our `MVar` instance, and
+only writing when `STOP` is received, the write being the _signal_ that the
+server must be shut down. The server will be only stopped once, so we are not
+concerned about blocking on writing. Another possible choice would be using
+`cats-effect`'s `Deferred`, but unlike `Deferred` `MVar` does allow to peek
+whether a value was written or not. As we shall see, this will come handy later
+on.
+
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+CONTINUA REVIEW POR AQUI
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
+////////////////////////////////////////////////
 
 And who shall signal that the server must be stopped? In this example, we will
 assume that it will be the connected users who can request the server to halt by

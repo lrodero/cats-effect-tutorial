@@ -63,11 +63,15 @@ to encapsulate those actions in their own `IO` instances.
 
 ```scala
 import cats.effect.IO
-
 import java.io._
 
-val inIO: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
-val outIO:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
+
+def copy(origin: File, destination: File): IO[Long] = {
+  val inIO: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
+  val outIO:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
+
+  ???
+}
 ```
 
 We want to ensure that once we are done copying both streams are close. For
@@ -76,10 +80,11 @@ resource adquisition, usage, and release.  Thus we define our `copy` function
 as follows:
 
 ```scala
-// From now on we assume these three imports to be present in all code snippets
 import cats.effect.IO
 import cats.implicits._ 
 import java.io._ 
+
+def transfer(origin: InputStream, destination: OutputStream): IO[Long] = ???
 
 def copy(origin: File, destination: File): IO[Long] = {
   val inIO: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
@@ -114,10 +119,19 @@ where given the resources we must return an `IO` instance that perform the task
 at hand.
 
 For the sake of clarity, the actual construction of that `IO` will be done by a
-different function. First we will create a `transmit` function that simply moves
-data from an stream to another using an array as data buffer:
+different function `transfer`. That function will have to define a loop that at
+each iteration reads data from the input stream into a buffer, and then writes
+the buffer contents into the output. At the same time, the loop will keep a
+counter of the bytes transferred. To reuse the same buffer we should define it
+outside the main loop, and leave the actual transmission of data to another
+function `transmit` that uses that loop. Something like:
+
 
 ```scala
+import cats.effect.IO
+import cats.implicits._ 
+import java.io._ 
+
 def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
   for {
     _      <- IO.cancelBoundary // Cancelable at each iteration
@@ -125,36 +139,24 @@ def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte]
     total  <- if(amount > -1) IO { destination.write(buffer, 0, amount) } *> transmit(origin, destination, buffer, acc + amount)
               else IO.pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
   } yield total // Returns the actual amount of bytes transmitted
-```
 
-Note that both input and output actions are encapsulated in their own `IO`
-instances. Being `IO` a monad we concatenate them using a for-comprehension to
-create another `IO`.
-
-There are several things to note in this function. First, the for-comprehension
-loops as long as the call to `read()` does not return a negative value, by
-means of recursive calls. But `IO` is stack safe, so we are not concerned about
-stack overflow issues. At each iteration we increase the counter `acc` with the
-amount of bytes read at that iteration.  Also, we introduce a call to
-`IO.cancelBoundary` as the first step of the loop. This is not mandatory for
-the actual transference of data we aim for. But it is a good policy, as it
-marks where the `IO` evaluation will be stopped (canceled) if requested. In
-this case, at each iteration.
-
-So far so good! We are almost there, we only need to allocate the buffer that
-will be used for moving data around. It could have been created by
-`transmit` itself but then we would need to refactor the function to
-prevent creating a new array at each iteration. That will be done by a new
-`transfer` function (by convenience we hardcode the buffer size to 10KBs, but
-that can be made configurable easily):
-
-```scala
 def transfer(origin: InputStream, destination: OutputStream): IO[Long] =
   for {
     buffer <- IO{ new Array[Byte](1024 * 10) } // Allocated only when the IO is evaluated
-    acc    <- transmitLoop(origin, destination, buffer, 0L)
+    acc    <- transmit(origin, destination, buffer, 0L)
   } yield acc
 ```
+Take a look to `transmit`, observe that both input and output actions are
+encapsulated in their own `IO` instances. Being `IO` a monad we concatenate them
+using a for-comprehension to create another `IO`. The for-comprehension loops as
+long as the call to `read()` does not return a negative value, by means of
+recursive calls. But `IO` is stack safe, so we are not concerned about stack
+overflow issues. At each iteration we increase the counter `acc` with the amount
+of bytes read at that iteration.  Also, we introduce a call to
+`IO.cancelBoundary` as the first step of the loop. This is not mandatory for the
+actual transference of data we aim for. But it is a good policy, as it marks
+where the `IO` evaluation will be stopped (canceled) if requested. In this case,
+at the beginning of each iteration.
 
 And that is it! We are done, now we can create a program that tests this
 function. We will use `IOApp` for that, as it allows to maintain purity in our
@@ -180,7 +182,7 @@ object CopyFile extends IOApp {
   def transfer(origin: InputStream, destination: OutputStream): IO[Long] =
     for {
       buffer <- IO{ new Array[Byte](1024 * 10) } // Allocated only when the IO is evaluated
-      acc    <- transmitLoop(origin, destination, buffer, 0L)
+      acc    <- transmit(origin, destination, buffer, 0L)
     } yield acc
 
   def copy(origin: File, destination: File): IO[Long] = {
@@ -213,6 +215,15 @@ object CopyFile extends IOApp {
 
 }
 ```
+
+`IOApp` is a kind of 'functional' equivalent to Scala's `App`, where instead of
+coding an effectful `main` method we code a pure `run` function. When executing
+the class a `main` method defined in `IOApp` will call the `run` function we
+have coded.
+
+Also, heed how `run` verifies the `args` list passed. If there are less than two
+arguments, an error is raised. As `IO` implements `MonadError` we can at any
+moment call to `IO.raiseError` to interrupt a sequence of `IO` operations.
 
 You can run this code from `sbt` just by issuing this call:
 
@@ -261,9 +272,9 @@ that simply replies to each text message from a client sending back that same
 message. When the client sends an empty line the connection is shutdown by the
 server.
 
-This server will be able to attend several clients at the same time. For that
-we will use `cats-effect`'s `Fiber`, an equivalent of threads. For each new
-client a `Fiber` instance will be spawned to serve that client.
+This server will be able to attend several clients at the same time. For that we
+will use `cats-effect`'s `Fiber`, which can be seen as light threads. For each
+new client a `Fiber` instance will be spawned to serve that client.
 
 A design guide we will stick to: whoever method creates a resource is the sole
 responsible of dispatching it.

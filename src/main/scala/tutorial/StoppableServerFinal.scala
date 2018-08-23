@@ -38,14 +38,14 @@ object StoppableServerFinal extends IOApp {
         lineE <- IO{ reader.readLine() }.attempt
         _     <- lineE match {
                    case Right(line) => line match {
-                     case "STOP" => stopFlag.put(()) *> IO.shift // Returns IO[Unit], which is handy as we are done here
+                     case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
                      case ""     => IO.unit          // Empty line, we are done
                      case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
                    }
                    case Left(e) =>
                      for { // readLine() failed, stopFlag will tell us whether this is a graceful shutdown
                        isEmpty <- stopFlag.isEmpty
-                       _       <- if(!isEmpty) IO.unit  // stopFlag is set, nothing to do
+                       _       <- if(!isEmpty) IO.unit  // stopFlag is set, cool, we are done
                                   else IO.raiseError(e) // stopFlag not set, must raise error
                      } yield ()
                  }
@@ -57,12 +57,10 @@ object StoppableServerFinal extends IOApp {
     import cats.effect.ExitCase.{Completed, Error, Canceled}
     (readerIO, writerIO)
       .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
-      .bracketCase {
+      .bracket {
         case (reader, writer) => loop(reader, writer)  // Let's get to work!
       } {
-        case ((reader, writer), Completed) => IO{println(s"Client ${clientSocket.getPort} Completed")} *> close(reader, writer) // We are done, closing the streams
-        case ((reader, writer), Error(e)) => IO{println(s"Client ${clientSocket.getPort} Error ${e.getMessage}")} *> close(reader, writer) // We are done, closing the streams
-        case ((reader, writer), Canceled) => IO{println(s"Client ${clientSocket.getPort} Canceled")} *> close(reader, writer) // We are done, closing the streams
+        case (reader, writer) => close(reader, writer) // We are done, closing the streams
       }
   }
 
@@ -77,19 +75,17 @@ object StoppableServerFinal extends IOApp {
       _       <- socketE match {
         case Right(socket) =>
           for { // accept() succeeded, we attend the client in its own Fiber
-            fiber <- IO{println(s"New client at port ${socket.getPort}")} *> echoProtocol(socket, stopFlag)
-                       .guarantee{IO{println(s"Closing client socket ${socket.getPort}")} *> close(socket)}     // We close the server whatever happens
-                       .start                        // Client attended by its own Fiber
-            /*fiber <- IO.pure{socket}.bracket{socket => echoProtocol(socket, stopFlag)}{socket => IO{println("Closing client socket")} *> close(socket)}
-                       .start*/
-            _     <- (stopFlag.read *> IO{println(s"Canceling fiber for socket ${socket.getPort}")} *> close(socket) *> IO.shift)
-                       .start                        // Another Fiber to cancel the client when stopFlag is set
-            _     <- serve(serverSocket, stopFlag)   // Looping back to the beginning
+            fiber <- echoProtocol(socket, stopFlag)
+                       .guarantee(close(socket))      // We close the server whatever happens
+                       .start                         // Client attended by its own Fiber
+            _     <- (stopFlag.read *> close(socket)) 
+                       .start                         // Another Fiber to cancel the client when stopFlag is set
+            _     <- serve(serverSocket, stopFlag)    // Looping to wait for the next client connection
           } yield ()
         case Left(e) =>
           for { // accept() failed, stopFlag will tell us whether this is a graceful shutdown
             isEmpty <- stopFlag.isEmpty
-            _       <- if(!isEmpty) IO.unit  // stopFlag is set, nothing to do
+            _       <- if(!isEmpty) IO.unit  // stopFlag is set, cool, we are done
                        else IO.raiseError(e) // stopFlag not set, must raise error
           } yield ()
       }
@@ -113,7 +109,7 @@ object StoppableServerFinal extends IOApp {
       .bracket {
         serverSocket => server(serverSocket) *> IO.pure(ExitCode.Success)
       } {
-        serverSocket => close(serverSocket)  *> IO{ println("Server finished") }
+        serverSocket => close(serverSocket)  *> IO{println("Server finished") }
       }
   }
 }

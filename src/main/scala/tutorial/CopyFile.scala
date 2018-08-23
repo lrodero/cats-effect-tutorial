@@ -17,7 +17,6 @@ package tutorial
 
 import cats.effect.{ExitCode, IO, IOApp}
 import cats.implicits._ 
-
 import java.io._ 
 
 object CopyFile extends IOApp {
@@ -37,10 +36,10 @@ object CopyFile extends IOApp {
     } yield acc
 
   def copy(origin: File, destination: File): IO[Long] = {
-    val in: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
-    val out:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
+    val inIO: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
+    val outIO:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
 
-    (in, out)                  // Stage 1: Getting resources 
+    (inIO, outIO)              // Stage 1: Getting resources 
       .tupled                  // From (IO[InputStream], IO[OutputStream]) to IO[(InputStream, OutputStream)]
       .bracket{
         case (in, out) =>
@@ -58,8 +57,8 @@ object CopyFile extends IOApp {
     for {
       _      <- if(args.length < 2) IO.raiseError(new IllegalArgumentException("Need origin and destination files"))
                 else IO.unit
-      orig = new File(args(0))
-      dest = new File(args(1))
+      orig   <- IO.pure(new File(args(0)))
+      dest   <- IO.pure(new File(args(1)))
       copied <- copy(orig, dest)
       _      <- IO{ println(s"$copied bytes copied from ${orig.getPath} to ${dest.getPath}") }
     } yield ExitCode.Success

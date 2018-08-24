@@ -114,6 +114,12 @@ action using `*>` call to return an `IO.unit` after closing (note that `*>` is
 like using `flatMap` but the second step does not need as input the output from
 the first).
 
+_WARNING: Stage 3 and stage 2 can happen simultaneously! That is not the case in
+the code here, but take that into account when coding your own guarded `IO`
+instances. For more info, see [Gotcha: Cancellation is a concurrent
+action](https://typelevel.org/cats-effect/datatypes/io.html#gotcha-cancellation-is-a-concurrent-action)
+in cats effect site._
+
 By `bracket` contract the action happens in what we have called _Stage 2_,
 where given the resources we must return an `IO` instance that perform the task
 at hand.
@@ -373,7 +379,7 @@ the line content. If empty it finishes the method, if not it sends back the
 line through the writer and loops back to the beginning. Easy, right :) ?
 
 So we are done with our `echoProtocol` method, good! But we still miss the part
-of our server that will list for new connections and create `Fiber`s to attend
+of our server that will list for new connections and create fibers to attend
 them. Let's work on that, we implement that functionality in another method
 that takes as input the `java.io.ServerSocket` instance that will listen for
 clients:
@@ -402,7 +408,7 @@ are created by this method, then it is in charge of closing them once
 that ensures that when the `IO` finishes the functionality inside `guarantee`
 is run whatever the outcome was. In this case we ensure closing the socket,
 ignoring any possible error when closing. Also quite interesting: we use
-`start`! By doing so the `echoProtocol` call will run on its own `Fiber` thus
+`start`! By doing so the `echoProtocol` call will run on its own fiber thus
 not blocking the main loop. As in the previous example to copy files, we include
 a call to `IO.cancelBoundary` so we ensure the loop can be cancelled at each
 iteration. However let's not mix up this with Java thread `interrupt` or the
@@ -411,6 +417,13 @@ in the code above, if the fiber is waiting on `accept()` then `cancel()` would
 not 'unlock' the fiber. Instead the fiber will keep waiting for a connection.
 Only when the loop iterates again and the `cancelBoundary` is reached then the
 fiber will be effectively canceled.
+
+_NOTE: If you have coded servers before, probably you are wondering if cats
+effect provides some magical way to attend an unlimited number of clients
+without balancing the load somehow. Truth is, it doesn't. You can spawn as many
+fibers as you wish, but there is no guarantee they will run simultaneously. More
+about this in the last section [Warning: fibers are not
+threads!](#fibersarenotthreads)_
 
 So, what do we miss now? Only the creation of the server socket of course,
 which we can already do in the `run` method of an `IOApp`. So our final server
@@ -523,7 +536,7 @@ better mechanisms to stop them. In this section we use some other `cats-effect`
 constructs to deal with this.
 
 First, we will use a flag to signal when the server shall quit. The server will
-run on its own `Fiber`, that will be canceled when that flag is set. The flag
+run on its own fiber, that will be canceled when that flag is set. The flag
 will be an instance of `MVar`. The `cats-effect` documentation describes `MVar`
 as _a mutable location that can be empty or contains a value, asynchronously
 blocking reads when empty and blocking writes when full_. That is what we need,
@@ -535,25 +548,13 @@ concerned about blocking on writing. Another possible choice would be using
 whether a value was written or not. As we shall see, this will come handy later
 on.
 
-////////////////////////////////////////////////
-////////////////////////////////////////////////
-////////////////////////////////////////////////
-////////////////////////////////////////////////
-////////////////////////////////////////////////
-CONTINUA REVIEW POR AQUI
-////////////////////////////////////////////////
-////////////////////////////////////////////////
-////////////////////////////////////////////////
-////////////////////////////////////////////////
-////////////////////////////////////////////////
-
 And who shall signal that the server must be stopped? In this example, we will
 assume that it will be the connected users who can request the server to halt by
 sendind a `STOP` message. Thus, the method attending clients (`echoProtocol`!)
 needs access to the flag.
 
 Let's first define a new method `server` that instantiates the flag, runs the
-`serve` method in its own `Fiber` and waits on the flag to be set. Only when
+`serve` method in its own fiber and waits on the flag to be set. Only when
 the flag is set the server fiber will be canceled.
 
 ```scala
@@ -660,7 +661,7 @@ object StoppableServer extends IOApp {
         _    <- IO.cancelBoundary
         line <- IO{ reader.readLine() }
         _    <- line match {
-                  case "STOP" => stopFlag.put(()) // Returns IO[Unit], which is handy as we are done here
+                  case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
                   case ""     => IO.unit          // Empty line, we are done
                   case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
                 }
@@ -678,7 +679,7 @@ object StoppableServer extends IOApp {
       }
   }
 
-  def serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
+ serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
 
     def close(socket: Socket): IO[Unit] = 
       IO{ socket.close() }.handleErrorWith(_ => IO.unit)
@@ -731,29 +732,29 @@ If you run the server coded above, open a telnet session against it and send an
 `STOP` message you will see how the server finishes properly.
 
 But there is a catch yet. If there are several clients connected, sending an
-`STOP` message will close the server's `Fiber` and the one attending the client
-that sent the message. But the other `Fiber`s will keep running normally! It is
+`STOP` message will close the server's fiber and the one attending the client
+that sent the message. But the other fibers will keep running normally! It is
 like they were daemon threads. Arguably, we could expect that shutting down the
 server shall close _all_ connections. How could we do it? Solving that issue is
 the proposed final exercise below.
 
-Final exercise
---------------
+Exercise
+--------
 We need to close all connections with clients when the server is shut down. To
 do that we can call `cancel` on each one of the `Fiber` instances we have
 created to attend each new client. But how? After all, we are not tracking
-which `Fiber`s are running at any given time.
+which fibers are running at any given time.
 
-We could keep a list of active `Fiber`s serving client connections. It is
+We could keep a list of active fibers serving client connections. It is
 doable, but cumbersome...  and not really needed at this point.
 
 Think about it: we have a `stopFlag` that signals when the server must be
 stopped. When that flag is set we can assume we shall close all client
 connections too. Thus  what we need to do is, every time we create a new
-`Fiber` to attend some new client, we must also make sure that when `stopFlag`
-is set that `Fiber` is canceled. As `Fiber` instances are very light we can
-create a new instance just to wait for `stopFlag.read` and then cancelling the
-client's own `Fiber`. This is how the `serve` method will look like now with
+fiber to attend some new client, we must also make sure that when `stopFlag`
+is set that client is 'shutdown'. As `Fiber` instances are very light we can
+create a new instance just to wait for `stopFlag.read` and then forcing the
+client to stop. This is how the `serve` method will look like now with
 that change:
 
 ```scala
@@ -769,46 +770,51 @@ def serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
       case Right(socket) =>
         for { // accept() succeeded, we attend the client in its own Fiber
           fiber <- echoProtocol(socket, stopFlag)
-                     .guarantee(close(socket))     // We close the server whatever happens
-                     .start                        // Client attended by its own Fiber
-          _     <- (stopFlag.read *> fiber.cancel)
-                     .start                        // Another Fiber to cancel the client when stopFlag is set
-          _     <- serve(serverSocket, stopFlag)   // Looping back to the beginning
+                     .guarantee(close(socket))      // We close the server whatever happens
+                     .start                         // Client attended by its own Fiber
+          _     <- (stopFlag.read *> close(socket)) 
+                     .start                         // Another Fiber to cancel the client when stopFlag is set
+          _     <- serve(serverSocket, stopFlag)    // Looping to wait for the next client connection
         } yield ()
       case Left(e) =>
         for { // accept() failed, stopFlag will tell us whether this is a graceful shutdown
           isEmpty <- stopFlag.isEmpty
-          _       <- if(!isEmpty) IO.unit  // stopFlag is set, nothing to do
+          _       <- if(!isEmpty) IO.unit  // stopFlag is set, cool, we are done
                      else IO.raiseError(e) // stopFlag not set, must raise error
         } yield ()
     }
   } yield ()
-  }
+}
 ```
 
-But note that when client socket is closed an exception will be raised by the
-`reader.readLine()` call in the `loop` method of `echoProtocol`. As it happened
-before with the server socket, the exception will be shown as an ugly error
-message in the console. To prevent this we modify the `loop` function so it uses
-`attempt` to control possible errors. If some error is detected first the state
-of `stopFlag` is checked, and if it is set a graceful shutdown is assumed and no
-action is taken; otherwise the error is raised:
+Now you may think '_wait a minute!, why don't cancelling the client fiber
+instead of closing the socket straight away?_'. Well, recall what we said
+before, cancellation will not have effect until the `cancelableBoundary` is
+reached.  That means that a new iteration would be needed, that is, some data
+shall be read from the incoming socket (see `echoProtocol` code). To force the
+termination even when the reader is waiting for input data we close the client
+socket. That will raise an exception in the `reader.readLine()` line.  As it
+happened before with the server socket, that exception will be shown as an ugly
+error message in the console. To prevent this we modify the `loop` function so
+it uses `attempt` to control possible errors. If some error is detected first
+the state of `stopFlag` is checked, and if it is set a graceful shutdown is
+assumed and no action is taken; otherwise the error is raised:
 
 ```scala
-def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
+def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
   for {
     _     <- IO.cancelBoundary
     lineE <- IO{ reader.readLine() }.attempt
     _     <- lineE match {
                case Right(line) => line match {
-                 case "STOP" => stopFlag.put(()) // Returns IO[Unit], which is handy as we are done here
+                 case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
                  case ""     => IO.unit          // Empty line, we are done
                  case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
                }
                case Left(e) =>
                  for { // readLine() failed, stopFlag will tell us whether this is a graceful shutdown
                    isEmpty <- stopFlag.isEmpty
-                   _       <- if(!isEmpty) IO.unit  // stopFlag is set, nothing to do
+                   _       <- if(!isEmpty) IO.unit  // stopFlag is set, cool, we are done
                               else IO.raiseError(e) // stopFlag not set, must raise error
                  } yield ()
              }
@@ -827,4 +833,57 @@ def serve(serverSocket: ServerSocket, protocol: (Socket, MVar[IO, Unit]) => IO[U
 After modifying `serve` code we would only need to change `server` so it includes
 the protocol to use in its call to `serve`.
 
-And what about trying to develop different protocols!?
+And what about trying to develop different protocols!? We let to your
+imagination how to expand this quite simple server with cats effect lib. But
+first take a look to the next and last section, it may give you more ideas ;)
+
+Warning: fibers are not threads!<a name="fibersarenotthreads"></a>
+--------------------------------
+As stated before, fibers are like 'light' threads, meaning they can be used in a
+similar way than threads to create concurrent code. However, they are _not_
+threads. Spawning new fibers does not guarantee that the action described in the
+`IO` associated to it will be run... immediately. At the end of the day, if no
+thread is available that can run the fiber, then the actions in that fiber will
+be blocked until some thread is available.
+
+You can test this yourself. Start the server defined in the previous sections
+and try to connect several clients (let's say 12). Soon you will notice that the
+latest clients... do not get any echo reply when sending lines! Why is that?
+Well, the answer is that the sooner fibers already used all _underlying_ threads
+available! But then, try to close some of the active clients by sending an empty
+line (recall that makes the server to close that client session). Immediately,
+one of the blocked clients will be active again.
+
+It shall be clear from that experiment than fibers are run by thread pools.
+Which one in our case? Well, `IOApp` automatically brings a `Timer[IO]`, that is
+defined by cats effect as a '_functional equivalente of Java's
+[ScheduledExecutorService](https://docs.oracle.com/javase/9/docs/api/java/util/concurrent/ScheduledExecutorService.html)_'.
+Each executor service has an underlying thread pool to execute the commands it
+is requested, and the same applies to `Timer`. So there are our threads!
+
+Cats effect provides ways to use different `scala.concurrent.ExecutionContext`s,
+each one with its own thread pool, and to swap which one should be used for each
+new `IO`, to ask to reschedule threads among the current active `IO`
+instances, for improved fairness etc. Such functionality is provided by
+`IO.shift` a call that can be confusing to beginners (and even intermediate)
+users of cats effect. But that is 'all' that it does.
+
+Given all this, how could we code servers able to handle an unlimited number of
+clients? Well, first we need using a network library that does not block on the
+different socket operations: `java.nio`. Such libraries should be used jointly
+with `cats.effect.Async`, that allows to define `IO` instances that will be
+executed _"independently of the main current flow"_. As a last exercise, we
+propose you to code a new version of the same echo server we created previously,
+but this time with asynchrony in mind.
+
+With all this we have covered a good deal of what cats effect has to offer.
+Maybe you think it is a bit cumbersome to use? Not really, given the power of
+the constructs it brings and, above all, the ability to operate with our code
+side effects in a purely functional manner. Enjoy the ride!
+
+
+
+
+
+
+

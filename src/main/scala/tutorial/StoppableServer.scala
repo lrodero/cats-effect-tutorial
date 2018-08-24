@@ -37,7 +37,7 @@ object StoppableServer extends IOApp {
         _    <- IO.cancelBoundary
         line <- IO{ reader.readLine() }
         _    <- line match {
-                  case "STOP" => stopFlag.put(()) // Returns IO[Unit], which is handy as we are done here
+                  case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
                   case ""     => IO.unit          // Empty line, we are done
                   case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
                 }
@@ -67,15 +67,15 @@ object StoppableServer extends IOApp {
         case Right(socket) =>
           for { // accept() succeeded, we attend the client in its own Fiber
             _ <- echoProtocol(socket, stopFlag)
-                   .guarantee(close(socket))   // We close the server whatever happens
-                   .start                      // Client attended by its own Fiber
-            _ <- serve(serverSocket, stopFlag) // Looping back to the beginning
+              .guarantee(close(socket))   // We close the server whatever happens
+              .start                      // Client attended by its own Fiber
+              _ <- serve(serverSocket, stopFlag) // Looping back to the beginning
           } yield ()
         case Left(e) =>
           for { // accept() failed, stopFlag will tell us whether this is a graceful shutdown
             isEmpty <- stopFlag.isEmpty
-            _ <- if(!isEmpty) IO.unit // stopFlag is set, nothing to do
-            else IO.raiseError(e)     // stopFlag not set, must raise error
+            _       <- if(!isEmpty) IO.unit    // stopFlag is set, nothing to do
+            else IO.raiseError(e)   // stopFlag not set, must raise error
           } yield ()
       }
     } yield ()
@@ -84,9 +84,9 @@ object StoppableServer extends IOApp {
   def server(serverSocket: ServerSocket): IO[ExitCode] =
     for {
       stopFlag    <- MVar[IO].empty[Unit]
-      serverFiber <- serve(serverSocket, stopFlag).start
-      _           <- stopFlag.read
-      _           <- serverFiber.cancel
+      serverFiber <- serve(serverSocket, stopFlag).start // Server runs on its own Fiber
+      _           <- stopFlag.read                       // Blocked until 'stopFlag.put(())' is run
+      _           <- serverFiber.cancel                  // Stopping server!
     } yield ExitCode.Success
 
   override def run(args: List[String]): IO[ExitCode] = {
@@ -96,7 +96,7 @@ object StoppableServer extends IOApp {
 
     IO{ new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) }
       .bracket {
-        serverSocket => server(serverSocket) *> IO.pure(ExitCode.Success)
+        serverSocket => server(serverSocket)
       } {
         serverSocket => close(serverSocket)  *> IO{ println("Server finished") }
       }

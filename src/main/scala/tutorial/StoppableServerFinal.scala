@@ -107,7 +107,7 @@ object StoppableServerFinal extends IOApp {
 
     IO{ new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) }
       .bracket {
-        serverSocket => server(serverSocket) *> IO.pure(ExitCode.Success)
+        serverSocket => server(serverSocket)
       } {
         serverSocket => close(serverSocket)  *> IO{println("Server finished") }
       }

@@ -847,26 +847,27 @@ thread is available that can run the fiber, then the actions in that fiber will
 be blocked until some thread is available.
 
 You can test this yourself. Start the server defined in the previous sections
-and try to connect several clients (let's say 12). Soon you will notice that the
-latest clients... do not get any echo reply when sending lines! Why is that?
-Well, the answer is that the sooner fibers already used all _underlying_ threads
-available! But then, try to close some of the active clients by sending an empty
-line (recall that makes the server to close that client session). Immediately,
-one of the blocked clients will be active again.
+and try to connect several clients (let's say 12). Soon you will notice that
+the latest clients... do not get any echo reply when sending lines! Why is
+that?  Well, the answer is that the first fibers already used all _underlying_
+threads available! But if we close one of the active clients by sending an
+empty line (recall that makes the server to close that client session) then
+immediately one of the blocked clients will be active.
 
 It shall be clear from that experiment than fibers are run by thread pools.
 Which one in our case? Well, `IOApp` automatically brings a `Timer[IO]`, that is
 defined by cats effect as a '_functional equivalente of Java's
 [ScheduledExecutorService](https://docs.oracle.com/javase/9/docs/api/java/util/concurrent/ScheduledExecutorService.html)_'.
 Each executor service has an underlying thread pool to execute the commands it
-is requested, and the same applies to `Timer`. So there are our threads!
+is requested, and the same applies to `Timer`, which is in charge of assigning
+available threads to the pending `IO` actions. So there are our threads!
 
 Cats effect provides ways to use different `scala.concurrent.ExecutionContext`s,
 each one with its own thread pool, and to swap which one should be used for each
 new `IO`, to ask to reschedule threads among the current active `IO`
 instances, for improved fairness etc. Such functionality is provided by
 `IO.shift` a call that can be confusing to beginners (and even intermediate)
-users of cats effect. But that is 'all' that it does.
+users of cats effect. So do not worry if it takes some time for you to master.
 
 Given all this, how could we code servers able to handle an unlimited number of
 clients? Well, first we need using a network library that does not block on the
@@ -880,10 +881,4 @@ With all this we have covered a good deal of what cats effect has to offer.
 Maybe you think it is a bit cumbersome to use? Not really, given the power of
 the constructs it brings and, above all, the ability to operate with our code
 side effects in a purely functional manner. Enjoy the ride!
-
-
-
-
-
-
 

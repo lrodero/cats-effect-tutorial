@@ -27,11 +27,57 @@ object LearningNIO extends IOApp {
   //  Must: 
   //   a) accumulate in buffer until -1 is returned by read() operation
   //   b) transform to String (?)
-  def readLine(asyncSktCh: AsynchronousSocketChannel): IO[Line] = {
+  def readLine(asyncSktCh: AsynchronousSocketChannel): IO[String] = {
+
+    def read(buffer: ByteBuffer, output: ByteArrayOutputStream): IO[Unit] =
+      IO.async[Int]{ cb =>
+
+        // TODO: Extract lines from buffer. If no line is found, buffer remains unchanged
+        def extractLines(stream: ByteArrayOutputStream): List[String] = {
+
+          // Why not ByteArrayOutputStream.toString() ? Well, we do not have guarantees that there is
+          // one and only one string :/
+
+          // See BufferedReader (has readLine)
+          // new BufferedReader(new InputStreamReader(new ByteArrayInputStream(buffer)))
+
+        }
+
+        def handler = new CompletionHandler[Int, Unit] {
+          override def completed(result: Int, void: Unit) = {
+            if(result > -1) {
+              val arr = buffer.array
+              output.write(arr, 0, result)
+            }
+            cb(Right(result))
+          }
+          override def failed(t: Throwable, void: Unit) = cb(Left(t))
+        }
+
+        Try{ asyncSckCh.read(byteBuffer, (), handler) }.toEither match {
+          case Right(_) => ()
+          case Left(t) => cb(Left(t))
+        }
+
+      }
+
+    def readLoop(buffer: ByteBuffer, output: ByteArrayOutputStream): IO[String] =
+      for {
+        amntRead <- read(buffer, output)
+        str      <- if(amntRead > -1) readLoop(buffer.reset, output)
+                    else IO(output.toString)
+      } yield str
+ 
+    for {
+      buffer <- IO(ByteBuffer.allocate(1024))
+      output <- IO(new ByteArrayOutputStream())
+      _      <- readLoop(buffer, output)
+    } yield ()
 
 
 
-    asyncSktCh.read 
+//    asyncSktCh.read 
+    ???
 
   }
 

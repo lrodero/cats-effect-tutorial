@@ -42,6 +42,15 @@ object LearningNIO extends IOApp {
         }
       }
 
+    // To be used if readLine returns nothing but the buffer is full
+    def resizeBuffer(bb: ByteBuffer, growthFactor: Double) = {
+      val arr = bb.array
+      val newArr = new Array[Byte]((arr.length * growthFactor).toInt)
+      Array.copy(arr, 0, newArr, 0, arr.length)
+      ByteBuffer.wrap(newArr).position(bb.position).limit(bb.limit)
+    }
+
+    // USE ByteBuffer.compact() once a line has been read!
     def extractLine(buffer: ByteBuffer, size: Int): Option[String] = {
       val reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(buffer.array(), 0, size)))
       Option(reader.readLine)

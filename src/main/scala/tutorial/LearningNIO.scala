@@ -20,14 +20,9 @@ object LearningNIO extends IOApp {
       }
     }
 
-  // OPEN PROBLEMS HERE: 
-  //  1- Size of buffer? let's assume 1KB
-  //  2- How to transform from bytes to string?   https://stackoverflow.com/questions/17354891/java-bytebuffer-to-string
-  //
-  //  Must: 
-  //   a) accumulate in buffer until -1 is returned by read() operation
-  //   b) transform to String (?)
-  def readLine(asyncSktCh: AsynchronousSocketChannel, buffer: ByteBuffer): IO[Option[String]] = {
+  class AsynchronousSocketChannelClosed(asyncSktCh: AsynchronousSocketChannel) extends Exception(s"${asyncSktCh.getRemoteAddress} channel closed")
+
+  def readLine(asyncSktCh: AsynchronousSocketChannel): IO[String] = {
 
     def read(buffer: ByteBuffer): IO[Int] =
       IO.async[Int]{ cb =>
@@ -42,32 +37,48 @@ object LearningNIO extends IOApp {
         }
       }
 
-    // To be used if readLine returns nothing but the buffer is full
-    def resizeBuffer(bb: ByteBuffer, growthFactor: Double) = {
+    /**
+     * Returns a copy of the byte buffer, resized by the growth factor.
+     * The returned byte buffer contains the same data than the original one,
+     * position is set to zero and both limit and capacity are the size of the
+     * array.
+     * To be used if readLine returns nothing but the buffer is full
+     */
+    def resizeBuffer(bb: ByteBuffer, growthFactor: Double = 2.0) = {
       val arr = bb.array
       val newArr = new Array[Byte]((arr.length * growthFactor).toInt)
       Array.copy(arr, 0, newArr, 0, arr.length)
-      ByteBuffer.wrap(newArr).position(bb.position).limit(bb.limit)
+      ByteBuffer.wrap(newArr)
     }
 
     // USE ByteBuffer.compact() once a line has been read!
-    def extractLine(buffer: ByteBuffer, size: Int): Option[String] = {
-      val reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(buffer.array(), 0, size)))
-      Option(reader.readLine)
+    def extractLine(buffer: ByteBuffer, bufferInit: Int, bufferEnd: Int): Option[String] = {
+      val reader = new BufferedReader(new InputStreamReader(new ByteArrayInputStream(buffer.array(), bufferInit, bufferEnd)))
+      val lineO = Option(reader.readLine)
+      reader.close
+      lineO
     }
 
-    def readLoop(buffer: ByteBuffer, acc: Int): IO[String] =
+    def readLoop(buffer: ByteBuffer): IO[String] =
       for {
-        amntRead <- read(buffer)
-        str      <- if(amntRead > -1) extractLine(buffer, amntRead).fold(readLoop(buffer, acc+amntRead))()
-                    else IO(Option.empty[String])
-      } yield str
- 
-    for {
-      buffer <- IO(ByteBuffer.allocate(1024))
-      _      <- readLoop(buffer, output, 0)
-    } yield ()
+        initPos  <- IO.pure(buffer.position) // position in buffer where read will start from
+        amntRead <- read(buffer) // Read data and write it onto buffer
+        -        <- if(amntRead == -1) IO.raiseError(new AsynchronousSocketChannelClosed(asyncSckCh)) // Socket channel closed, nothing could be read
+                    else IO.unit
+        lineO = extractLine(buffer, initPos, buffer.position) // in case you are curious buffer.position should be the same as initPos + amntRead
+        line <- lineO match {
+                  case None => if(buffer.position == buffer.capacity) {  // buffer got full!! must read again on a bigger buffer that keeps the original data
+                                 val biggerBuffer = resizeBuffer(buffer)
+                                 biggerBuffer.position(buffer.position)
+                                 readLoop(biggerBuffer)
+                               } else { // Simply, read operation did not got a full line... must read again on the same buffer
+                                 readLoop(buffer)
+                               }
+                  case Some(l) => IO.pure(l)
+                }
+      } yield line
 
+    readLoop(ByteBuffer.allocate(1024)
   }
 
 

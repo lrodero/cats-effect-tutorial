@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package tutorial
+package catsEffectTutorial
 
 import cats.effect._
 import cats.implicits._
@@ -21,7 +21,11 @@ import cats.implicits._
 import java.io._
 import java.net._
 
-object SimpleServer extends IOApp {
+/** Server that listens on a given port, and for each new connected client it spawns a new fiber to attend it. This
+ *  fiber will just send back any line sent by the client ('echo'). When a client sends an empty line, the connection
+ *  with that client is closed.
+ */
+object EchoServerV1_Simple extends IOApp {
 
   def echoProtocol(clientSocket: Socket): IO[Unit] = {
   

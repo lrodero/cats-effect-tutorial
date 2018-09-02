@@ -1,4 +1,4 @@
-package tutorial
+package catsEffectTutorial
 
 import cats.effect._
 import cats.effect.Clock._ // extractFromTimer

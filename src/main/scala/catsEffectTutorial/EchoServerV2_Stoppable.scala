@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package tutorial
+package catsEffectTutorial
 
 import cats.effect._
 import cats.effect.concurrent.MVar
@@ -22,7 +22,9 @@ import cats.implicits._
 import java.io._
 import java.net._
 
-object StoppableServer extends IOApp {
+/** Similar to [[EchoServerV1_Simple]], with an added feature: if a client sends 'STOP' then the server is shut down.
+ */
+object EchoServerV2_Stoppable extends IOApp {
 
   def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
   

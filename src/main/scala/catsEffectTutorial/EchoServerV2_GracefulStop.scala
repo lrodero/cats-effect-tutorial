@@ -24,7 +24,7 @@ import java.net._
 
 /** Similar to [[EchoServerV1_Simple]], with an added feature: if a client sends 'STOP' then the server is shut down.
  */
-object EchoServerV2_Stoppable extends IOApp {
+object EchoServerV2_GracefulStop extends IOApp {
 
   def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
   

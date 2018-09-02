@@ -1,6 +1,6 @@
 name := "cats-effect-tutorial"
 
-version := "0.5"
+version := "1.0"
 
 scalaVersion := "2.12.2"
 

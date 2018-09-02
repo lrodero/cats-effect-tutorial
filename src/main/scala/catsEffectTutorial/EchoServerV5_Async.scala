@@ -21,13 +21,17 @@ import cats.implicits._
 
 import java.io._
 import java.net._
+import java.util.concurrent.Executors
 
-/** Similar to [[EchoServerV2_GracefulStop]], with an added feature: when shutdown, it closes all the open client
- *  connections.
+import scala.concurrent.ExecutionContext
+import scala.util.Try
+
+/** Similar to [[EchoServerV3_ClosingClientsOnShutdown]], but making use of async() on blocking methods and using an
+ *  'explicit' execution context.
  */
-object EchoServerV3_ClosingClientsOnShutdown extends IOApp {
+object EchoServerV5_Async extends IOApp {
 
-  def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
+  def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit])(implicit clientsExecutionContext: ExecutionContext): IO[Unit] = {
   
     def close(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
       (IO{reader.close()}, IO{writer.close()})
@@ -38,7 +42,14 @@ object EchoServerV3_ClosingClientsOnShutdown extends IOApp {
     def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
       for {
         _     <- IO.cancelBoundary
-        lineE <- IO{ reader.readLine() }.attempt
+        lineE <- IO.async{ (cb: Either[Throwable, Either[Throwable, String]] => Unit) => 
+          clientsExecutionContext.execute(new Runnable {
+            override def run(): Unit = {
+              val result: Either[Throwable, String] = Try{ reader.readLine() }.toEither
+              cb(Right(result))
+            }
+          })
+        }
         _     <- lineE match {
                    case Right(line) => line match {
                      case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
@@ -67,7 +78,7 @@ object EchoServerV3_ClosingClientsOnShutdown extends IOApp {
       }
   }
 
-  def serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
+  def serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit])(implicit clientsExecutionContext: ExecutionContext): IO[Unit] = {
 
     def close(socket: Socket): IO[Unit] = 
       IO{ socket.close() }.handleErrorWith(_ => IO.unit)
@@ -95,13 +106,20 @@ object EchoServerV3_ClosingClientsOnShutdown extends IOApp {
     } yield ()
   }
 
-  def server(serverSocket: ServerSocket): IO[ExitCode] = 
+  def server(serverSocket: ServerSocket): IO[ExitCode] = {
+
+    val clientsThreadPool = Executors.newCachedThreadPool()
+    implicit val clientsExecutionContext = ExecutionContext.fromExecutor(clientsThreadPool)
+
     for {
-      stopFlag    <- MVar[IO].empty[Unit]
-      serverFiber <- serve(serverSocket, stopFlag).start
-      _           <- stopFlag.read *> IO{println(s"Stopping server")}
-      _           <- serverFiber.cancel
+      stopFlag     <- MVar[IO].empty[Unit]
+      serverFiber  <- serve(serverSocket, stopFlag).start
+      _            <- stopFlag.read *> IO{println(s"Stopping server")}
+      _            <- IO{clientsThreadPool.shutdown()}
+      _            <- serverFiber.cancel
     } yield ExitCode.Success
+
+  }
 
   override def run(args: List[String]): IO[ExitCode] = {
 

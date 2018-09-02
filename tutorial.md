@@ -22,7 +22,7 @@ the build tool. This is a possible `build.sbt` file for the project:
 ```scala
 name := "cats-effect-tutorial"
 
-version := "0.1"
+version := "1.0"
 
 scalaVersion := "2.12.2"
 
@@ -37,8 +37,13 @@ scalacOptions ++= Seq(
   "-Ypartial-unification")
 ```
 
-Copying contents of a file
---------------------------
+All code in this tutorial, including the `build.sbt` file described above, are
+available at [this tutorial Github
+repo](https://github.com/lrodero/cats-effect-tutorial).
+
+
+Warming up: Copying contents of a file
+--------------------------------------
 First we will code a function that copies the content from a file to another
 file. The function takes as parameters the source and destination files. But
 this is functional programming! So invoking the function will not copy
@@ -114,9 +119,9 @@ action using `*>` call to return an `IO.unit` after closing (note that `*>` is
 like using `flatMap` but the second step does not need as input the output from
 the first).
 
-_WARNING: Stage 3 and stage 2 can happen simultaneously! That is not the case in
-the code here, but take that into account when coding your own guarded `IO`
-instances. For more info, see [Gotcha: Cancellation is a concurrent
+_**WARNING**: Stage 3 and stage 2 can happen simultaneously! That is not the
+case in the code here, but take that into account when coding your own guarded
+`IO` instances. For more info, see [Gotcha: Cancellation is a concurrent
 action](https://typelevel.org/cats-effect/datatypes/io.html#gotcha-cancellation-is-a-concurrent-action)
 in cats effect site._
 
@@ -271,8 +276,8 @@ your IO-kungfu:
    it is not a valid number. `run` will use the third arg as buffer size if
    present, if not a default hardcode value will be passed to `copy`.
 
-Echo server
------------
+A more complete system: Echo server
+-----------------------------------
 This example scales up a bit on complexity. Here we create an echo TCP server
 that simply replies to each text message from a client sending back that same
 message. When the client sends an empty line the connection is shutdown by the
@@ -427,76 +432,8 @@ threads!](#fibersarenotthreads)_
 
 So, what do we miss now? Only the creation of the server socket of course,
 which we can already do in the `run` method of an `IOApp`. So our final server
-version will look like this:
-
-```scala
-package tutorial
-
-import cats.effect._
-import cats.implicits._
-
-import java.io._
-import java.net._
-
-object SimpleServer extends IOApp {
-
-  def echoProtocol(clientSocket: Socket): IO[Unit] = {
-  
-    def close(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
-      (IO{reader.close()}, IO{writer.close()})
-        .tupled                        // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
-        .map(_ => ())                  // From IO[(Unit, Unit)] IO[Unit]
-        .handleErrorWith(_ => IO.unit) // Swallowing up any possible error
-  
-    def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = for {
-      _    <- IO.cancelBoundary
-      line <- IO{ reader.readLine() }
-      _    <- line match {
-                case "" => IO.unit // Empty line, we are done
-                case _  => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
-              }
-    } yield ()
-  
-    val readerIO = IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) }
-    val writerIO = IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) }
-  
-    (readerIO, writerIO)
-      .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
-      .bracket {
-        case (reader, writer) => loop(reader, writer)  // Let's get to work!
-      } {
-        case (reader, writer) => close(reader, writer) // We are done, closing the streams
-      }
-  }
-
-  def serve(serverSocket: ServerSocket): IO[Unit] = {
-    def close(socket: Socket): IO[Unit] = 
-      IO{ socket.close() }.handleErrorWith(_ => IO.unit)
-  
-    for {
-      _      <- IO.cancelBoundary
-      socket <- IO{ serverSocket.accept() }
-      _      <- echoProtocol(socket)
-                  .guarantee(close(socket)) // We close the socket whatever happens
-                  .start                    // Client attended by its own Fiber!
-      _      <- serve(serverSocket)         // Looping back to the beginning
-    } yield ()
-  }
-
-  override def run(args: List[String]): IO[ExitCode] = {
-  
-    def close(socket: ServerSocket): IO[Unit] =
-      IO{ socket.close() }.handleErrorWith(_ => IO.unit)
-  
-    IO{ new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) }
-      .bracket{
-        serverSocket => serve(serverSocket) *> IO.pure(ExitCode.Success)
-      } {
-        serverSocket => close(serverSocket) *> IO{ println("Server finished") }
-      }
-  }
-}
-```
+version will look [like
+this](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV1_Simple.scala).
 
 As before you can run in for example from the `sbt` console just by typing
  
@@ -528,8 +465,9 @@ it? Well, that is something we have not addressed yet and it is when things can
 get a bit more complicated. We will deal with proper server halting in the next
 section.
 
-Handling exit events in echo server
------------------------------------
+
+Handling exit events in echo server (graceful server stop)
+----------------------------------------------------------
 There is no way to shutdown gracefully the echo server coded in the previous
 version. Sure we can always `<Ctrl>-c` it, but proper servers should provide
 better mechanisms to stop them. In this section we use some other `cats-effect`
@@ -633,100 +571,9 @@ deciding what to do depending on whether the `stopFlag` is set or not.
 There is only one step missing, modifying `echoLoop`. The only relevant changes
 are two: modifying the signature to pass the `stopFlag` flag; and in the `loop`
 function checking whether the line from the client equals `STOP`, in such case
-the flag we will set and the function will be finished. The final code looks as
-follows:
-
-```scala
-package tutorial
-
-import cats.effect._
-import cats.effect.concurrent.MVar
-import cats.implicits._
-
-import java.io._
-import java.net._
-
-object StoppableServer extends IOApp {
-
-  def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
-  
-    def close(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
-      (IO{reader.close()}, IO{writer.close()})
-        .tupled                        // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
-        .map(_ => ())                  // From IO[(Unit, Unit)] to IO[Unit]
-        .handleErrorWith(_ => IO.unit) // Swallowing up any possible error
-  
-    def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
-      for {
-        _    <- IO.cancelBoundary
-        line <- IO{ reader.readLine() }
-        _    <- line match {
-                  case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
-                  case ""     => IO.unit          // Empty line, we are done
-                  case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
-                }
-      } yield ()
-
-    val readerIO = IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) }
-    val writerIO = IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) }
-  
-    (readerIO, writerIO)
-      .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
-      .bracket {
-        case (reader, writer) => loop(reader, writer)  // Let's get to work!
-      } {
-        case (reader, writer) => close(reader, writer) // We are done, closing the streams
-      }
-  }
-
- serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
-
-    def close(socket: Socket): IO[Unit] = 
-      IO{ socket.close() }.handleErrorWith(_ => IO.unit)
-
-    for {
-      _       <- IO.cancelBoundary
-      socketE <- IO{ serverSocket.accept() }.attempt
-      _       <- socketE match {
-        case Right(socket) =>
-          for { // accept() succeeded, we attend the client in its own Fiber
-            _ <- echoProtocol(socket, stopFlag)
-                   .guarantee(close(socket))   // We close the server whatever happens
-                   .start                      // Client attended by its own Fiber
-            _ <- serve(serverSocket, stopFlag) // Looping back to the beginning
-          } yield ()
-        case Left(e) =>
-          for { // accept() failed, stopFlag will tell us whether this is a graceful shutdown
-            isEmpty <- stopFlag.isEmpty
-            _       <- if(!isEmpty) IO.unit    // stopFlag is set, nothing to do
-                       else IO.raiseError(e)   // stopFlag not set, must raise error
-          } yield ()
-      }
-    } yield ()
-  }
-
-  def server(serverSocket: ServerSocket): IO[ExitCode] = 
-    for {
-      stopFlag    <- MVar[IO].empty[Unit]
-      serverFiber <- serve(serverSocket, stopFlag).start
-      _           <- stopFlag.read
-      _           <- serverFiber.cancel
-    } yield ExitCode.Success
-
-  override def run(args: List[String]): IO[ExitCode] = {
-
-    def close(socket: ServerSocket): IO[Unit] =
-      IO{ socket.close() }.handleErrorWith(_ => IO.unit)
-
-    IO{ new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) }
-      .bracket {
-        serverSocket => server(serverSocket) *> IO.pure(ExitCode.Success)
-      } {
-        serverSocket => close(serverSocket)  *> IO{ println("Server finished") }
-      }
-  }
-}
-```
+the flag we will set and the function will be finished. The final code looks
+[like
+this](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV2_GracefulStop.scala).
 
 If you run the server coded above, open a telnet session against it and send an
 `STOP` message you will see how the server finishes properly.
@@ -738,13 +585,17 @@ like they were daemon threads. Arguably, we could expect that shutting down the
 server shall close _all_ connections. How could we do it? Solving that issue is
 the proposed final exercise below.
 
-Exercise
---------
+Closing client connections to echo server on shutdown (exercise)
+----------------------------------------------------------------
 We need to close all connections with clients when the server is shut down. To
 do that we can call `cancel` on each one of the `Fiber` instances we have
 created to attend each new client. But how? After all, we are not tracking
-which fibers are running at any given time.
+which fibers are running at any given time. We propose this exercise to you: can
+you devise a mechanism so all client connections are closed when the server is
+shutdown? We propose a solution in the next subsection, but maybe you can
+consider taking some time looking for a solution :) .
 
+## Solution
 We could keep a list of active fibers serving client connections. It is
 doable, but cumbersome...  and not really needed at this point.
 
@@ -821,6 +672,9 @@ def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
   } yield ()
 ```
 
+The resulting server code is [also
+available](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV3_ClosingClientsOnShutdown).
+
 There are many other improvements that can be applied to this code, like for
 example modifying `serve` so instead of using a hardcoded call to `echoProtocol`
 it calls to some method passed as parameter. That way the same function could be
@@ -835,7 +689,7 @@ the protocol to use in its call to `serve`.
 
 And what about trying to develop different protocols!? We let to your
 imagination how to expand this quite simple server with cats effect lib. But
-first take a look to the next and last section, it may give you more ideas ;)
+first take a look to the next sections, it may give you more ideas ;)
 
 Warning: fibers are not threads!<a name="fibersarenotthreads"></a>
 --------------------------------
@@ -854,9 +708,10 @@ threads available! But if we close one of the active clients by sending an
 empty line (recall that makes the server to close that client session) then
 immediately one of the blocked clients will be active.
 
-It shall be clear from that experiment than fibers are run by thread pools.
-Which one in our case? Well, `IOApp` automatically brings a `Timer[IO]`, that is
-defined by cats effect as a '_functional equivalente of Java's
+It shall be clear from that experiment than fibers are run by thread pools. And
+that in our case, all our fibers share the same thread pool!  Which one in our
+case? Well, `IOApp` automatically brings a `Timer[IO]`, that is defined by cats
+effect as a '_functional equivalente of Java's
 [ScheduledExecutorService](https://docs.oracle.com/javase/9/docs/api/java/util/concurrent/ScheduledExecutorService.html)_'.
 Each executor service has an underlying thread pool to execute the commands it
 is requested, and the same applies to `Timer`, which is in charge of assigning
@@ -866,8 +721,99 @@ Cats effect provides ways to use different `scala.concurrent.ExecutionContext`s,
 each one with its own thread pool, and to swap which one should be used for each
 new `IO`, to ask to reschedule threads among the current active `IO`
 instances, for improved fairness etc. Such functionality is provided by
-`IO.shift` a call that can be confusing to beginners (and even intermediate)
-users of cats effect. So do not worry if it takes some time for you to master.
+`IO.shift`. Also, it even allows to 'swap' to different `Timer`s (that is,
+different thread pools) when running `IO` actions. See this code, which is
+mostly a copy example available at [IO documentation in cats effect web, Thread
+Shifting
+section](https://typelevel.org/cats-effect/datatypes/io.html#thread-shifting):
+
+```scala
+import java.util.concurrent.Executors
+
+import scala.concurrent.ExecutionContext
+
+val cachedThreadPool = Executors.newCachedThreadPool()
+val clientsExecutionContext = ExecutionContext.fromExecutor(cachedThreadPool)
+implicit val Main = ExecutionContext.global
+
+for {
+  _ <- IO.shift(clientsExecutionContext) // Swapping to cached thread pool
+  _ <- IO{} // Whatever is done here, is done by a thread from the cached thread pool
+  _ <- IO.shift 
+  _ <- IO(println(s"Welcome $name!")) // Swapping back to default timer
+  _ <- IO(cachedThreadPool.shutdown())
+} yield ()
+```
+
+`IO.shift` is a powerful tool but can be a bit confusing to beginners (and even
+intermediate) users of cats effect. So do not worry if it takes some time for
+you to master.
+
+Using a custom thread pool in Echo server (exercise)
+----------------------------------------------------
+Given what we know so far, how could we solve the problem of the limited number
+of clients attended in parallel in our Echo server? Recall that in traditional
+servers we would make use of an specific thread pool for clients, able to resize
+in case more threads are needed. You can get such a pool using
+`Executors.newCachedThreadPool()` as in the example of the previous section. But
+take care of shutting it down when the server is stopped!
+
+## Solution
+Well, the solution is quite straighforward. We only need to create a thread pool
+and execution context, and use it whenever we need to read input from some
+connected client. So the beginning of the `loop` function would look like:
+
+```scala
+for{
+  _     <- IO.cancelBoundary
+  _     <- IO.shift(clientsExecutionContext)
+  lineE <- IO{ reader.readLine() }.attempt
+  _     <- IO.shift(ExecutionContext.global)
+  //
+```
+
+and... that is mostly it. Only pending change is to create the thread pool and
+execution context in the `server` function, which will be in charge also of
+shutting down the thread pool when the server finishes:
+
+```scala
+def server(serverSocket: ServerSocket): IO[ExitCode] = {
+
+  val clientsThreadPool = Executors.newCachedThreadPool()
+  implicit val clientsExecutionContext = ExecutionContext.fromExecutor(clientsThreadPool)
+
+  for {
+    stopFlag     <- MVar[IO].empty[Unit]
+    serverFiber  <- serve(serverSocket, stopFlag).start
+    _            <- stopFlag.read *> IO{println(s"Stopping server")}
+    _            <- IO{clientsThreadPool.shutdown()}
+    _            <- serverFiber.cancel
+  } yield ExitCode.Success
+
+}
+```
+
+Signatures of `serve` and of `echoProtocol` will have to be changed too to pass
+the execution context as parameter. The resulting server code is [available in
+github](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV4_ClientThreadPool).
+
+Let's not forget about async
+----------------------------
+The `async` functionality is another powerful capability of cats effect...
+
+// FINISH THIS ONCE AND FOR ALL!
+
+
+
+
+
+
+
+
+
+
+////////// TALK ABOUT JAVA NIO, NIO2 FOR A PROPER NON-BLOCKING SERVER
+
 
 Given all this, how could we code servers able to handle an unlimited number of
 clients? Well, first we need using a network library that does not block on the

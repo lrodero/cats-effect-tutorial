@@ -21,16 +21,16 @@ import cats.implicits._
 
 import java.io._
 import java.net._
-import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.Executors
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
-/** Similar to [[EchoServerV2_Stoppable]], but making use of async() on blocking methods.
+/** Similar to [[EchoServerV3_ClosingClientsOnShutdown]], but making use of an specific thread pool for clients read ops.
  */
-object EchoServerV4_Async extends IOApp {
+object EchoServerV4_ClientThreadPool extends IOApp {
 
-  def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
+  def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit])(implicit clientsExecutionContext: ExecutionContext): IO[Unit] = {
   
     def close(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
       (IO{reader.close()}, IO{writer.close()})
@@ -41,10 +41,9 @@ object EchoServerV4_Async extends IOApp {
     def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
       for {
         _     <- IO.cancelBoundary
-        lineE <- IO.async{ (cb: Either[Throwable, Either[Throwable, String]] => Unit) => 
-          val result: Either[Throwable, String] = Try{ reader.readLine() }.toEither
-          cb(Right(result))
-        }
+        _     <- IO.shift(clientsExecutionContext)
+        lineE <- IO{ reader.readLine() }.attempt
+        _     <- IO.shift(ExecutionContext.global)
         _     <- lineE match {
                    case Right(line) => line match {
                      case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
@@ -73,17 +72,14 @@ object EchoServerV4_Async extends IOApp {
       }
   }
 
-  def serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
+  def serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit])(implicit clientsExecutionContext: ExecutionContext): IO[Unit] = {
 
     def close(socket: Socket): IO[Unit] = 
       IO{ socket.close() }.handleErrorWith(_ => IO.unit)
 
     for {
       _       <- IO.cancelBoundary
-      socketE <- IO.async{ (cb: Either[Throwable, Either[Throwable, Socket]] => Unit) =>
-                   val result: Either[Throwable, Socket] = Try{ serverSocket.accept() }.toEither
-                   cb(Right(result))
-                 }  
+      socketE <- IO{ serverSocket.accept() }.attempt
       _       <- socketE match {
         case Right(socket) =>
           for { // accept() succeeded, we attend the client in its own Fiber
@@ -104,15 +100,20 @@ object EchoServerV4_Async extends IOApp {
     } yield ()
   }
 
-  def server(serverSocket: ServerSocket): IO[ExitCode] = 
+  def server(serverSocket: ServerSocket): IO[ExitCode] = {
+
+    val clientsThreadPool = Executors.newCachedThreadPool()
+    implicit val clientsExecutionContext = ExecutionContext.fromExecutor(clientsThreadPool)
+
     for {
       stopFlag     <- MVar[IO].empty[Unit]
-      thPoolEx = {val stpe = new ScheduledThreadPoolExecutor(5); stpe.setMaximumPoolSize(100); stpe}
-      clientsTimer = IO.timer(ExecutionContext.fromExecutor(thPoolEx), thPoolEx)
       serverFiber  <- serve(serverSocket, stopFlag).start
       _            <- stopFlag.read *> IO{println(s"Stopping server")}
+      _            <- IO{clientsThreadPool.shutdown()}
       _            <- serverFiber.cancel
     } yield ExitCode.Success
+
+  }
 
   override def run(args: List[String]): IO[ExitCode] = {
 

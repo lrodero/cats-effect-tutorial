@@ -27,7 +27,7 @@ import scala.concurrent.ExecutionContext
 import scala.util.Try
 
 /** Similar to [[EchoServerV3_ClosingClientsOnShutdown]], but making use of async() on blocking methods and using an
- *  'explicit' execution context.
+ *  execution context to run those methods in their own thread.
  */
 object EchoServerV5_Async extends IOApp {
 
@@ -43,13 +43,13 @@ object EchoServerV5_Async extends IOApp {
       for {
         _     <- IO.cancelBoundary
         lineE <- IO.async{ (cb: Either[Throwable, Either[Throwable, String]] => Unit) => 
-          clientsExecutionContext.execute(new Runnable {
-            override def run(): Unit = {
-              val result: Either[Throwable, String] = Try{ reader.readLine() }.toEither
-              cb(Right(result))
-            }
-          })
-        }
+                   clientsExecutionContext.execute(new Runnable {
+                     override def run(): Unit = {
+                       val result: Either[Throwable, String] = Try{ reader.readLine() }.toEither
+                       cb(Right(result))
+                     }
+                   })
+                 }
         _     <- lineE match {
                    case Right(line) => line match {
                      case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done

@@ -123,7 +123,7 @@ _**WARNING**: Stage 3 and stage 2 can happen simultaneously! That is not the
 case in the code here, but take that into account when coding your own guarded
 `IO` instances. For more info, see [Gotcha: Cancellation is a concurrent
 action](https://typelevel.org/cats-effect/datatypes/io.html#gotcha-cancellation-is-a-concurrent-action)
-in cats effect site._
+in cats-effect site._
 
 By `bracket` contract the action happens in what we have called _Stage 2_,
 where given the resources we must return an `IO` instance that perform the task
@@ -423,8 +423,8 @@ not 'unlock' the fiber. Instead the fiber will keep waiting for a connection.
 Only when the loop iterates again and the `cancelBoundary` is reached then the
 fiber will be effectively canceled.
 
-_NOTE: If you have coded servers before, probably you are wondering if cats
-effect provides some magical way to attend an unlimited number of clients
+_NOTE: If you have coded servers before, probably you are wondering if
+cats-effect provides some magical way to attend an unlimited number of clients
 without balancing the load somehow. Truth is, it doesn't. You can spawn as many
 fibers as you wish, but there is no guarantee they will run simultaneously. More
 about this in the last section [Warning: fibers are not
@@ -688,7 +688,7 @@ After modifying `serve` code we would only need to change `server` so it include
 the protocol to use in its call to `serve`.
 
 And what about trying to develop different protocols!? We let to your
-imagination how to expand this quite simple server with cats effect lib. But
+imagination how to expand this quite simple server with cats-effect lib. But
 first take a look to the next sections, it may give you more ideas ;)
 
 Warning: fibers are not threads!<a name="fibersarenotthreads"></a>
@@ -710,20 +710,20 @@ immediately one of the blocked clients will be active.
 
 It shall be clear from that experiment than fibers are run by thread pools. And
 that in our case, all our fibers share the same thread pool!  Which one in our
-case? Well, `IOApp` automatically brings a `Timer[IO]`, that is defined by cats
-effect as a '_functional equivalente of Java's
+case? Well, `IOApp` automatically brings a `Timer[IO]`, that is defined by
+cats-effect as a '_functional equivalente of Java's
 [ScheduledExecutorService](https://docs.oracle.com/javase/9/docs/api/java/util/concurrent/ScheduledExecutorService.html)_'.
 Each executor service has an underlying thread pool to execute the commands it
 is requested, and the same applies to `Timer`, which is in charge of assigning
 available threads to the pending `IO` actions. So there are our threads!
 
-Cats effect provides ways to use different `scala.concurrent.ExecutionContext`s,
+Cats-effect provides ways to use different `scala.concurrent.ExecutionContext`s,
 each one with its own thread pool, and to swap which one should be used for each
 new `IO`, to ask to reschedule threads among the current active `IO`
 instances, for improved fairness etc. Such functionality is provided by
 `IO.shift`. Also, it even allows to 'swap' to different `Timer`s (that is,
 different thread pools) when running `IO` actions. See this code, which is
-mostly a copy example available at [IO documentation in cats effect web, Thread
+mostly a copy example available at [IO documentation in cats-effect web, Thread
 Shifting
 section](https://typelevel.org/cats-effect/datatypes/io.html#thread-shifting):
 
@@ -746,7 +746,7 @@ for {
 ```
 
 `IO.shift` is a powerful tool but can be a bit confusing to beginners (and even
-intermediate) users of cats effect. So do not worry if it takes some time for
+intermediate) users of cats-effect. So do not worry if it takes some time for
 you to master.
 
 Using a custom thread pool in Echo server (exercise)
@@ -799,7 +799,74 @@ github](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/sca
 
 Let's not forget about async
 ----------------------------
-The `async` functionality is another powerful capability of cats effect...
+The `async` functionality is another powerful capability of cats-effect. It
+allows to build `IO` instances that may be terminated by a thread different than
+the one carrying the evaluation of that instance. Result will be returned by
+using a callback.
+
+Some of you can wonder if that could help us to solve the issue of having
+blocking code in our fabolous echo server. Thing is, `async` cannot magically
+'unblock' such code. Try this simple snippet:
+
+```scala
+import cats.effect.IO
+import cats.implicits._
+
+import scala.util.Either
+
+for {
+  _ <- IO(println("Starting"))
+  _ <- IO.async[Unit]{ (cb: Either[Throwable,Unit] => Unit) =>
+      Thread.sleep(2000)
+      cb(Right(()))
+    }
+  _ <- IO(println("Done")) // 2 seconds to get here, no matter what
+} yield()
+```
+
+You will notice that the code still blocks. So how is this useful? Well, because
+it allows a different thread to finish the task, we can modify the blocking read
+call inside the `loop` function of our server with something like:
+
+```scala
+for {
+  _     <- IO.cancelBoundary
+  lineE <- IO.async{ (cb: Either[Throwable, Either[Throwable, String]] => Unit) => 
+             clientsExecutionContext.execute(new Runnable {
+               override def run(): Unit = {
+                 val result: Either[Throwable, String] = Try{ reader.readLine() }.toEither
+                 cb(Right(result))
+               }
+             })
+           }
+// ...           
+```
+Notice that the call `clientsExecutionContext.execute` will be created on a
+thread from that execution context, setting free on the other hand the thread
+that was evaluating the `IO` for-comprehension. If the thread pool used by the
+execution context can create new threads if no free ones are available, then
+we will be able to attend as many clients as needed. This is similar to the
+solution we used previously shifting the task to the execution context! And in
+fact `shift` makes something close to what we have just coded, so the next `IO`
+instances are evaluated in threads from its execution context, setting in fact
+an async boundary.
+
+The `async` construct is useful specially when the task to run by the `IO` can
+be terminated by any thread. For example, calls to remote services are often
+modelled with `Future`s so they do not block the calling thread. When defining
+our `IO`, should we block on the `Future` waiting for the result? No! We can
+wrap the call in an `async` call like:
+
+```scala
+IO.async[String]{ cb => 
+  service.getSomething().onCompleted {
+    case Success(s) => cb(Right(s))
+    case Failure(e) => cb(Left(e))
+  }
+}
+```
+
+
 
 // FINISH THIS ONCE AND FOR ALL!
 
@@ -823,7 +890,7 @@ executed _"independently of the main current flow"_. As a last exercise, we
 propose you to code a new version of the same echo server we created previously,
 but this time with asynchrony in mind.
 
-With all this we have covered a good deal of what cats effect has to offer.
+With all this we have covered a good deal of what cats-effect has to offer.
 Maybe you think it is a bit cumbersome to use? Not really, given the power of
 the constructs it brings and, above all, the ability to operate with our code
 side effects in a purely functional manner. Enjoy the ride!

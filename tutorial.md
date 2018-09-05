@@ -797,12 +797,13 @@ Signatures of `serve` and of `echoProtocol` will have to be changed too to pass
 the execution context as parameter. The resulting server code is [available in
 github](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV4_ClientThreadPool).
 
+
 Let's not forget about async
 ----------------------------
-The `async` functionality is another powerful capability of cats-effect. It
-allows to build `IO` instances that may be terminated by a thread different than
-the one carrying the evaluation of that instance. Result will be returned by
-using a callback.
+The `async` functionality is another powerful capability of cats-effect we have
+not mentioned yet. It allows to build `IO` instances that may be terminated by a
+thread different than the one carrying the evaluation of that instance. Result
+will be returned by using a callback.
 
 Some of you can wonder if that could help us to solve the issue of having
 blocking code in our fabolous echo server. Thing is, `async` cannot magically
@@ -824,9 +825,9 @@ for {
 } yield()
 ```
 
-You will notice that the code still blocks. So how is this useful? Well, because
-it allows a different thread to finish the task, we can modify the blocking read
-call inside the `loop` function of our server with something like:
+You will notice that the code still blocks. So how is `async` useful? Well,
+because it allows a different thread to finish the task, we can modify the
+blocking read call inside the `loop` function of our server with something like:
 
 ```scala
 for {
@@ -841,15 +842,15 @@ for {
            }
 // ...           
 ```
-Notice that the call `clientsExecutionContext.execute` will be created on a
-thread from that execution context, setting free on the other hand the thread
-that was evaluating the `IO` for-comprehension. If the thread pool used by the
-execution context can create new threads if no free ones are available, then
-we will be able to attend as many clients as needed. This is similar to the
-solution we used previously shifting the task to the execution context! And in
-fact `shift` makes something close to what we have just coded, so the next `IO`
-instances are evaluated in threads from its execution context, setting in fact
-an async boundary.
+
+Notice that the call `clientsExecutionContext.execute` will create a thread from
+that execution context, setting free on the other hand the thread that was
+evaluating the `IO` for-comprehension. If the thread pool used by the execution
+context can create new threads if no free ones are available, then we will be
+able to attend as many clients as needed. This is similar to the solution we
+used previously shifting the task to the execution context! And in fact `shift`
+makes something close to what we have just coded: it introduces asynchronous
+boundaries to reorganize how threads are used.
 
 The `async` construct is useful specially when the task to run by the `IO` can
 be terminated by any thread. For example, calls to remote services are often
@@ -858,7 +859,7 @@ our `IO`, should we block on the `Future` waiting for the result? No! We can
 wrap the call in an `async` call like:
 
 ```scala
-IO.async[String]{ cb => 
+IO.async[String]{ (cb: Either[Throwable, String] => Unit) => 
   service.getSomething().onCompleted {
     case Success(s) => cb(Right(s))
     case Failure(e) => cb(Left(e))
@@ -866,29 +867,22 @@ IO.async[String]{ cb =>
 }
 ```
 
+So, our aim is to create an echo server that does not require a thread per
+connected socket to wait on the blocking `read()` method. If we use a network
+library that avoids or at limits blocking operations, we could then combine that
+with `async` to create such non-blocking server.
+
+While Java NIO does have some blocking method (`Selector`'s `select()`), it
+allows to build servers that do not require a thread per connected client:
+`select()` will return those 'channels' (such as `SochetChannel`) that have data
+available to read from, then processing of the incoming data can be split among
+threads of a size-bounded pool. This way, a thread-per-client approach is not
+needed. Java NIO2 follows a different philosophy than NIO, and it is arguably
+more complex to handle. 
 
 
-// FINISH THIS ONCE AND FOR ALL!
-
-
-
-
-
-
-
-
-
-
-////////// TALK ABOUT JAVA NIO, NIO2 FOR A PROPER NON-BLOCKING SERVER
-
-
-Given all this, how could we code servers able to handle an unlimited number of
-clients? Well, first we need using a network library that does not block on the
-different socket operations: `java.nio`. Such libraries should be used jointly
-with `cats.effect.Async`, that allows to define `IO` instances that will be
-executed _"independently of the main current flow"_. As a last exercise, we
-propose you to code a new version of the same echo server we created previously,
-but this time with asynchrony in mind.
+Conclusion
+----------
 
 With all this we have covered a good deal of what cats-effect has to offer.
 Maybe you think it is a bit cumbersome to use? Not really, given the power of

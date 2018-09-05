@@ -15,7 +15,7 @@ $ sbt
 
 Any of the files can be executed also using `sbt`. So for example to run `tutorial.CopyFile` to copy an `origin.txt` file to another `destination.txt` file we will run:
 ```bash
-> runMain tutorial.CopyFile origin.txt destination.txt
+> runMain catsEffectTutorial.CopyFile origin.txt destination.txt
 ```
 
 Generate the tutorial HTML

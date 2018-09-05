@@ -1,63 +1,78 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+<!doctype html>
+<html>
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-  <meta http-equiv="Content-Style-Type" content="text/css" />
-  <meta name="generator" content="pandoc" />
-  <title></title>
-  <style type="text/css">code{white-space: pre;}</style>
-  <style type="text/css">
+<meta charset="utf-8">
+<meta name="generator" content="pandoc">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title></title>
+
+<!-- Yahoo! CDN combo URL for selected Pure.css modules -->
+<link rel="stylesheet" href="http://yui.yahooapis.com/combo?pure/0.6.0/base-min.css&pure/0.6.0/grids-responsive-min.css&pure/0.6.0/menus-min.css&pure/0.6.0/tables-min.css">
+
+<!-- Extra styles -->
+<style>
+body{margin:1em 0 0}.pure-g{padding:0 1em}.pure-menu-link:focus{background-color:#d3d3d3}nav{margin:0 0 1em;padding:0 0 1em;border-bottom:1px solid #ccc}footer{margin:5em 0 1em}pre{white-space:pre-wrap;margin-left:3em}code{font-size:89%;color:#191919}.author{margin-bottom:0;padding-bottom:0}.headnote,.published,.license{font-size:89%;margin-bottom:.75em}@media screen and (max-width:35.5em){thead{display:none}tr,th,td{display:block}td{border-top:0}tr td:first-child{border-top:1px solid #ddd;font-weight:700}}
+</style>
+
+<style>
 div.sourceCode { overflow-x: auto; }
 table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
   margin: 0; padding: 0; vertical-align: baseline; border: none; }
-table.sourceCode { width: 100%; line-height: 100%; }
+table.sourceCode { width: 100%; line-height: 100%; background-color: #f8f8f8; }
 td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
 td.sourceCode { padding-left: 5px; }
-code > span.kw { color: #007020; font-weight: bold; } /* Keyword */
-code > span.dt { color: #902000; } /* DataType */
-code > span.dv { color: #40a070; } /* DecVal */
-code > span.bn { color: #40a070; } /* BaseN */
-code > span.fl { color: #40a070; } /* Float */
-code > span.ch { color: #4070a0; } /* Char */
-code > span.st { color: #4070a0; } /* String */
-code > span.co { color: #60a0b0; font-style: italic; } /* Comment */
-code > span.ot { color: #007020; } /* Other */
-code > span.al { color: #ff0000; font-weight: bold; } /* Alert */
-code > span.fu { color: #06287e; } /* Function */
-code > span.er { color: #ff0000; font-weight: bold; } /* Error */
-code > span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
-code > span.cn { color: #880000; } /* Constant */
-code > span.sc { color: #4070a0; } /* SpecialChar */
-code > span.vs { color: #4070a0; } /* VerbatimString */
-code > span.ss { color: #bb6688; } /* SpecialString */
+pre, code { background-color: #f8f8f8; }
+code > span.kw { color: #204a87; font-weight: bold; } /* Keyword */
+code > span.dt { color: #204a87; } /* DataType */
+code > span.dv { color: #0000cf; } /* DecVal */
+code > span.bn { color: #0000cf; } /* BaseN */
+code > span.fl { color: #0000cf; } /* Float */
+code > span.ch { color: #4e9a06; } /* Char */
+code > span.st { color: #4e9a06; } /* String */
+code > span.co { color: #8f5902; font-style: italic; } /* Comment */
+code > span.ot { color: #8f5902; } /* Other */
+code > span.al { color: #ef2929; } /* Alert */
+code > span.fu { color: #000000; } /* Function */
+code > span.er { color: #a40000; font-weight: bold; } /* Error */
+code > span.wa { color: #8f5902; font-weight: bold; font-style: italic; } /* Warning */
+code > span.cn { color: #000000; } /* Constant */
+code > span.sc { color: #000000; } /* SpecialChar */
+code > span.vs { color: #4e9a06; } /* VerbatimString */
+code > span.ss { color: #4e9a06; } /* SpecialString */
 code > span.im { } /* Import */
-code > span.va { color: #19177c; } /* Variable */
-code > span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
-code > span.op { color: #666666; } /* Operator */
-code > span.bu { } /* BuiltIn */
+code > span.va { color: #000000; } /* Variable */
+code > span.cf { color: #204a87; font-weight: bold; } /* ControlFlow */
+code > span.op { color: #ce5c00; font-weight: bold; } /* Operator */
+code > span.pp { color: #8f5902; font-style: italic; } /* Preprocessor */
 code > span.ex { } /* Extension */
-code > span.pp { color: #bc7a00; } /* Preprocessor */
-code > span.at { color: #7d9029; } /* Attribute */
-code > span.do { color: #ba2121; font-style: italic; } /* Documentation */
-code > span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
-code > span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
-code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
-  </style>
-  <link rel="stylesheet" href="pandoc.css" type="text/css" />
+code > span.at { color: #c4a000; } /* Attribute */
+code > span.do { color: #8f5902; font-weight: bold; font-style: italic; } /* Documentation */
+code > span.an { color: #8f5902; font-weight: bold; font-style: italic; } /* Annotation */
+code > span.cv { color: #8f5902; font-weight: bold; font-style: italic; } /* CommentVar */
+code > span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Information */
+</style>
 </head>
 <body>
-<h1 id="cats-effect-tutorial">Cats-effect tutorial</h1>
+<section id="page-content">
+<div class="pure-g">
+<div class="pure-u-1 pure-u-sm-1 pure-u-md-1 pure-u-lg-1 pure-u-xl-1">
+
+<!-- page content begins here -->
+
+<div id="cats-effect-tutorial" class="section level1">
+<h1>Cats-effect tutorial</h1>
 <p><a href="https://typelevel.org/cats-effect">Cats-effect</a>, the effects library for <a href="https://typelevel.org/cats">Cats</a>, has a complete documentation explaining the types it brings, full with small examples on how to use them. However, even with that documentation available, it can be a bit daunting start using the library for the first time.</p>
 <p>This tutorial tries to close that gap by means of two examples. The first one shows how to copy the contents from one file to another. That should help us to flex our muscles. The second one, being still a small example, is fairly more complex. It shows how to code a TCP server able to attend several clients at the same time, each one being served by its own <code>Fiber</code>. In several iterations we will create new versions of that server with addded functionality that will require using more and more concepts of <code>cats-effect</code>.</p>
-<h2 id="setting-things-up">Setting things up</h2>
+<div id="setting-things-up" class="section level2">
+<h2>Setting things up</h2>
 <p>To easy coding the snippets in this tutorial it is recommended to use <code>sbt</code> as the build tool. This is a possible <code>build.sbt</code> file for the project:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">name := <span class="st">&quot;cats-effect-tutorial&quot;</span>
 
-version := <span class="st">&quot;0.1&quot;</span>
+version := <span class="st">&quot;1.0&quot;</span>
 
 scalaVersion := <span class="st">&quot;2.12.2&quot;</span>
 
-libraryDependencies += <span class="st">&quot;org.typelevel&quot;</span> %% <span class="st">&quot;cats-effect&quot;</span> % <span class="st">&quot;1.0.0-RC2&quot;</span> <span class="fu">withSources</span>() <span class="fu">withJavadoc</span>()
+libraryDependencies += <span class="st">&quot;org.typelevel&quot;</span> %% <span class="st">&quot;cats-effect&quot;</span> % <span class="st">&quot;1.0.0-RC3&quot;</span>
 
 scalacOptions ++= Seq(
   <span class="st">&quot;-feature&quot;</span>,
@@ -66,7 +81,10 @@ scalacOptions ++= Seq(
   <span class="st">&quot;-language:postfixOps&quot;</span>,
   <span class="st">&quot;-language:higherKinds&quot;</span>,
   <span class="st">&quot;-Ypartial-unification&quot;</span>)</code></pre></div>
-<h2 id="copying-contents-of-a-file">Copying contents of a file</h2>
+<p>All code in this tutorial, including the <code>build.sbt</code> file described above, are available at <a href="https://github.com/lrodero/cats-effect-tutorial">this tutorial Github repo</a>.</p>
+</div>
+<div id="warming-up-copying-contents-of-a-file" class="section level2">
+<h2>Warming up: Copying contents of a file</h2>
 <p>First we will code a function that copies the content from a file to another file. The function takes as parameters the source and destination files. But this is functional programming! So invoking the function will not copy anything, instead it returns an <code>IO</code> instance that encapsulates all the side-effects involved (opening files, copying content, etc.), that way <em>purity</em> is kept. Only when that <code>IO</code> instance is evaluated all those side-effects will run. In our implementation the <code>IO</code> instance will return the amount of bytes copied upon execution, but this is just a design decission. All this said, the signature of our function looks like this:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">import</span> cats.<span class="fu">effect</span>.<span class="fu">IO</span>
 <span class="kw">import</span> java.<span class="fu">io</span>.<span class="fu">File</span>
@@ -74,16 +92,21 @@ scalacOptions ++= Seq(
 <span class="kw">def</span> <span class="fu">copy</span>(origin: File, destination: File): IO[Long] = ???</code></pre></div>
 <p>Nothing scary, uh? Now, let's go step-by-step to implement our function. First thing to do, we need to open two streams that will read and write file contents. We consider opening an stream to be a side-effect action, so we have to encapsulate those actions in their own <code>IO</code> instances.</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">import</span> cats.<span class="fu">effect</span>.<span class="fu">IO</span>
-
 <span class="kw">import</span> java.<span class="fu">io</span>._
 
-<span class="kw">val</span> inIO: IO[InputStream]  = IO{ <span class="kw">new</span> BufferedInputStream(<span class="kw">new</span> FileInputStream(origin)) }
-<span class="kw">val</span> outIO:IO[OutputStream] = IO{ <span class="kw">new</span> BufferedOutputStream(<span class="kw">new</span> FileOutputStream(destination)) }</code></pre></div>
+
+<span class="kw">def</span> <span class="fu">copy</span>(origin: File, destination: File): IO[Long] = {
+  <span class="kw">val</span> inIO: IO[InputStream]  = IO{ <span class="kw">new</span> BufferedInputStream(<span class="kw">new</span> FileInputStream(origin)) }
+  <span class="kw">val</span> outIO:IO[OutputStream] = IO{ <span class="kw">new</span> BufferedOutputStream(<span class="kw">new</span> FileOutputStream(destination)) }
+
+  ???
+}</code></pre></div>
 <p>We want to ensure that once we are done copying both streams are close. For that we will use <code>bracket</code>. There are three stages when using <code>bracket</code>: resource adquisition, usage, and release. Thus we define our <code>copy</code> function as follows:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="co">// From now on we assume these three imports to be present in all code snippets</span>
-<span class="kw">import</span> cats.<span class="fu">effect</span>.<span class="fu">IO</span>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">import</span> cats.<span class="fu">effect</span>.<span class="fu">IO</span>
 <span class="kw">import</span> cats.<span class="fu">implicits</span>._ 
 <span class="kw">import</span> java.<span class="fu">io</span>._ 
+
+<span class="kw">def</span> <span class="fu">transfer</span>(origin: InputStream, destination: OutputStream): IO[Long] = ???
 
 <span class="kw">def</span> <span class="fu">copy</span>(origin: File, destination: File): IO[Long] = {
   <span class="kw">val</span> inIO: IO[InputStream]  = IO{ <span class="kw">new</span> BufferedInputStream(<span class="kw">new</span> FileInputStream(origin)) }
@@ -102,23 +125,27 @@ scalacOptions ++= Seq(
     }
 }</code></pre></div>
 <p>So far so good, we have our streams ready to go! And in a safe manner too, as the <code>bracket</code> construct ensures they are closed no matter what. Note that any possible error raised when closing is 'swallowed' by the <code>handleErrorWith</code> call, which in the code above basically ignores the error cause. Not elegant, but enough for this example. Anyway in the real world there would be little else to do save maybe showing a warning message. Finally we chain the closing action using <code>*&gt;</code> call to return an <code>IO.unit</code> after closing (note that <code>*&gt;</code> is like using <code>flatMap</code> but the second step does not need as input the output from the first).</p>
+<p><em><strong>WARNING</strong>: Stage 3 and stage 2 can happen simultaneously! That is not the case in the code here, but take that into account when coding your own guarded <code>IO</code> instances. For more info, see <a href="https://typelevel.org/cats-effect/datatypes/io.html#gotcha-cancellation-is-a-concurrent-action">Gotcha: Cancellation is a concurrent action</a> in cats-effect site.</em></p>
 <p>By <code>bracket</code> contract the action happens in what we have called <em>Stage 2</em>, where given the resources we must return an <code>IO</code> instance that perform the task at hand.</p>
-<p>For the sake of clarity, the actual construction of that <code>IO</code> will be done by a different function. First we will create a <code>transmit</code> function that simply moves data from an stream to another using an array as data buffer:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">transmit</span>(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
+<p>For the sake of clarity, the actual construction of that <code>IO</code> will be done by a different function <code>transfer</code>. That function will have to define a loop that at each iteration reads data from the input stream into a buffer, and then writes the buffer contents into the output. At the same time, the loop will keep a counter of the bytes transferred. To reuse the same buffer we should define it outside the main loop, and leave the actual transmission of data to another function <code>transmit</code> that uses that loop. Something like:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">import</span> cats.<span class="fu">effect</span>.<span class="fu">IO</span>
+<span class="kw">import</span> cats.<span class="fu">implicits</span>._ 
+<span class="kw">import</span> java.<span class="fu">io</span>._ 
+
+<span class="kw">def</span> <span class="fu">transmit</span>(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
   <span class="kw">for</span> {
     _      &lt;- IO.<span class="fu">cancelBoundary</span> <span class="co">// Cancelable at each iteration</span>
     amount &lt;- IO{ origin.<span class="fu">read</span>(buffer, <span class="dv">0</span>, buffer.<span class="fu">size</span>) }
     total  &lt;- <span class="kw">if</span>(amount &gt; <span class="dv">-1</span>) IO { destination.<span class="fu">write</span>(buffer, <span class="dv">0</span>, amount) } *&gt; <span class="fu">transmit</span>(origin, destination, buffer, acc + amount)
               <span class="kw">else</span> IO.<span class="fu">pure</span>(acc) <span class="co">// End of read stream reached (by java.io.InputStream contract), nothing to write</span>
-  } <span class="kw">yield</span> total <span class="co">// Returns the actual amount of bytes transmitted</span></code></pre></div>
-<p>Note that both input and output actions are encapsulated in their own <code>IO</code> instances. Being <code>IO</code> a monad we concatenate them using a for-comprehension to create another <code>IO</code>.</p>
-<p>There are several things to note in this function. First, the for-comprehension loops as long as the call to <code>read()</code> does not return a negative value, by means of recursive calls. But <code>IO</code> is stack safe, so we are not concerned about stack overflow issues. At each iteration we increase the counter <code>acc</code> with the amount of bytes read at that iteration. Also, we introduce a call to <code>IO.cancelBoundary</code> as the first step of the loop. This is not mandatory for the actual transference of data we aim for. But it is a good policy, as it marks where the <code>IO</code> evaluation will be stopped (cancelled) if requested. In this case, at each iteration.</p>
-<p>So far so good! We are almost there, we only need to allocate the buffer that will be used for moving data around. It could have been created by <code>transmit</code> itself but then we would need to refactor the function to prevent creating a new array at each iteration. That will be done by a new <code>transfer</code> function (by convenience we hardcode the buffer size to 10KBs, but that can be made configurable easily):</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">transfer</span>(origin: InputStream, destination: OutputStream): IO[Long] =
+  } <span class="kw">yield</span> total <span class="co">// Returns the actual amount of bytes transmitted</span>
+
+<span class="kw">def</span> <span class="fu">transfer</span>(origin: InputStream, destination: OutputStream): IO[Long] =
   <span class="kw">for</span> {
     buffer &lt;- IO{ <span class="kw">new</span> Array[Byte](<span class="dv">1024</span> * <span class="dv">10</span>) } <span class="co">// Allocated only when the IO is evaluated</span>
-    acc    &lt;- <span class="fu">transmitLoop</span>(origin, destination, buffer, 0L)
+    acc    &lt;- <span class="fu">transmit</span>(origin, destination, buffer, 0L)
   } <span class="kw">yield</span> acc</code></pre></div>
+<p>Take a look to <code>transmit</code>, observe that both input and output actions are encapsulated in their own <code>IO</code> instances. Being <code>IO</code> a monad we concatenate them using a for-comprehension to create another <code>IO</code>. The for-comprehension loops as long as the call to <code>read()</code> does not return a negative value, by means of recursive calls. But <code>IO</code> is stack safe, so we are not concerned about stack overflow issues. At each iteration we increase the counter <code>acc</code> with the amount of bytes read at that iteration. Also, we introduce a call to <code>IO.cancelBoundary</code> as the first step of the loop. This is not mandatory for the actual transference of data we aim for. But it is a good policy, as it marks where the <code>IO</code> evaluation will be stopped (canceled) if requested. In this case, at the beginning of each iteration.</p>
 <p>And that is it! We are done, now we can create a program that tests this function. We will use <code>IOApp</code> for that, as it allows to maintain purity in our definitions up to the main function. So our final code will look like:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">package</span> tutorial
 
@@ -139,7 +166,7 @@ scalacOptions ++= Seq(
   <span class="kw">def</span> <span class="fu">transfer</span>(origin: InputStream, destination: OutputStream): IO[Long] =
     <span class="kw">for</span> {
       buffer &lt;- IO{ <span class="kw">new</span> Array[Byte](<span class="dv">1024</span> * <span class="dv">10</span>) } <span class="co">// Allocated only when the IO is evaluated</span>
-      acc    &lt;- <span class="fu">transmitLoop</span>(origin, destination, buffer, 0L)
+      acc    &lt;- <span class="fu">transmit</span>(origin, destination, buffer, 0L)
     } <span class="kw">yield</span> acc
 
   <span class="kw">def</span> <span class="fu">copy</span>(origin: File, destination: File): IO[Long] = {
@@ -171,9 +198,13 @@ scalacOptions ++= Seq(
     } <span class="kw">yield</span> ExitCode.<span class="fu">Success</span>
 
 }</code></pre></div>
+<p><code>IOApp</code> is a kind of 'functional' equivalent to Scala's <code>App</code>, where instead of coding an effectful <code>main</code> method we code a pure <code>run</code> function. When executing the class a <code>main</code> method defined in <code>IOApp</code> will call the <code>run</code> function we have coded.</p>
+<p>Also, heed how <code>run</code> verifies the <code>args</code> list passed. If there are less than two arguments, an error is raised. As <code>IO</code> implements <code>MonadError</code> we can at any moment call to <code>IO.raiseError</code> to interrupt a sequence of <code>IO</code> operations.</p>
 <p>You can run this code from <code>sbt</code> just by issuing this call:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">&gt; runMain tutorial.<span class="fu">CopyFile</span></code></pre></div>
-<h2 id="exercises">Exercises</h2>
+</div>
+<div id="exercises" class="section level2">
+<h2>Exercises</h2>
 <p>To finalize we propose you some exercises that will help you to keep improving your IO-kungfu:</p>
 <ol style="list-style-type: decimal">
 <li>If the list of args has less than 2 elements an exception is thrown. This is a bit rough. Create instead an <code>evaluateArgs</code> function that checks the validity of the arguments given to the main function. This function will return an <code>Either[String, Unit]</code> instance. In case of error (that is, the list of args has less than two elements), the <code>Left[String]</code> will contain an error message, <code>Right[Unit]</code> will signal that the list of args is fine. The function signature will thus be:</li>
@@ -184,17 +215,18 @@ scalacOptions ++= Seq(
 <li>What happens if the user asks to copy a file that does not exist? You can check it yourself: a not-so-good-looking exception is thrown and shown to the user. Think and experiment mechanisms to capture such exceptions and show better-looking error messages.</li>
 <li>Modify <code>transmit</code> so the buffer size is not hardcoded but passed as parameter. That parameter will be passed through <code>transmitLoop</code>, <code>transfer</code> and <code>copy</code> from the main <code>run</code> function. Modify the <code>run</code> and <code>evaluateArgs</code> functions so the buffer size can optionally be stated when calling to the program. <code>evaluateArgs</code> shall signal error if the third arg is present but it is not a valid number. <code>run</code> will use the third arg as buffer size if present, if not a default hardcode value will be passed to <code>copy</code>.</li>
 </ol>
-<h2 id="echo-server">Echo server</h2>
+</div>
+<div id="a-more-complete-system-echo-server" class="section level2">
+<h2>A more complete system: Echo server</h2>
 <p>This example scales up a bit on complexity. Here we create an echo TCP server that simply replies to each text message from a client sending back that same message. When the client sends an empty line the connection is shutdown by the server.</p>
-<p>This server will be able to attend several clients at the same time. For that we will use <code>cats-effect</code>'s <code>Fiber</code>, an equivalent of threads. For each new client a <code>Fiber</code> instance will be spawned to serve that client.</p>
+<p>This server will be able to attend several clients at the same time. For that we will use <code>cats-effect</code>'s <code>Fiber</code>, which can be seen as light threads. For each new client a <code>Fiber</code> instance will be spawned to serve that client.</p>
 <p>A design guide we will stick to: whoever method creates a resource is the sole responsible of dispatching it.</p>
 <p>Let's build our server step-by-step. First we will code a method that implement the echo protocol. It will take as input the socket (<code>java.net.Socket</code> instance) that is connected to the client. The method will be basically a loop that at each iteration reads the input from the client, if the input is not an empty line then the text is sent back to the client, otherwise the method will finish. The method signature will look like this:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">import</span> cats.<span class="fu">effect</span>.<span class="fu">IO</span>
 <span class="kw">import</span> java.<span class="fu">net</span>.<span class="fu">Socket</span>
 <span class="kw">def</span> <span class="fu">echoProtocol</span>(clientSocket: Socket): IO[Unit] = ???</code></pre></div>
 <p>Reading and writing will be done using <code>java.io.BufferedReader</code> and <code>java.io.BufferedWriter</code> instances build from the socket. Recall that this method will be in charge of closing those buffers, but not the client socket (it did not create that socket after all!). So we can start coding the method scaffolding:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="co">// From now on we assume these imports to be present in all code snippets</span>
-<span class="kw">import</span> cats.<span class="fu">effect</span>._
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">import</span> cats.<span class="fu">effect</span>._
 <span class="kw">import</span> cats.<span class="fu">implicits</span>._
 <span class="kw">import</span> java.<span class="fu">io</span>._
 <span class="kw">import</span> java.<span class="fu">net</span>._
@@ -220,7 +252,7 @@ scalacOptions ++= Seq(
       <span class="kw">case</span> (reader, writer) =&gt; <span class="fu">close</span>(reader, writer) <span class="co">// We are done, closing the streams</span>
     }
 }</code></pre></div>
-<p>Note that we are using again <code>bracket</code> to ensure that the method closes the two streams it creates. Also, all actions with potential side-effects are encapsulated in <code>IO</code> instances. That way we ensure no side-effect is actually run until the <code>IO</code> returned by this method is evaluated. We could use as well <code>bracketCase</code> for a finer control of what actually caused the termination:</p>
+<p>Realize that we are using again <code>bracket</code> to ensure that the method closes the two streams it creates. Also, all actions with potential side-effects are encapsulated in <code>IO</code> instances. That way we ensure no side-effect is actually run until the <code>IO</code> returned by this method is evaluated. We could use as well <code>bracketCase</code> for a finer control of what actually caused the termination:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">import</span> cats.<span class="fu">effect</span>.<span class="fu">Exitcase</span>._
 
 (IO{ <span class="kw">new</span> BufferedReader(<span class="kw">new</span> InputStreamReader(clientSocket.<span class="fu">getInputStream</span>())) },
@@ -233,7 +265,7 @@ scalacOptions ++= Seq(
     <span class="kw">case</span> ((reader, writer), Canceled)   =&gt; IO{ <span class="fu">println</span>(<span class="st">&quot;Finished service to client because cancellation&quot;</span>) } *&gt; <span class="fu">close</span>(reader, writer)
     <span class="kw">case</span> ((reader, writer), Error(err)) =&gt; IO{ <span class="fu">println</span>(s<span class="st">&quot;Finished service to client due to error: &#39;${err.getMessage}&#39;&quot;</span>) } *&gt; <span class="fu">close</span>(reader, writer)
   }</code></pre></div>
-<p>That is probably a good policy and you must be aware that possibility exists. But for the sake of clarity we will stick to the simpler <code>bracket</code>.</p>
+<p>That is a good policy and you must be aware that possibility exists. But for the sake of clarity we will stick to the simpler <code>bracket</code> for this tutorial.</p>
 <p>Finally, and as we did in the previous example, we ignore possible errors when closing the streams, as there is little to do in such cases. But, of course, we still miss that <code>loop</code> method that will do the actual interactions with the client. It is not hard to code though:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">loop</span>(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
   <span class="kw">for</span> {
@@ -244,8 +276,8 @@ scalacOptions ++= Seq(
               <span class="kw">case</span> _  =&gt; IO{ writer.<span class="fu">write</span>(line); writer.<span class="fu">newLine</span>(); writer.<span class="fu">flush</span>() } *&gt; <span class="fu">loop</span>(reader, writer)
             }
   } <span class="kw">yield</span> ()</code></pre></div>
-<p>The loop tries to read a line from the client, and if successful then it checks the line content. If empty it finishes the method, if not it sends back the line through the writer and loops back to the beginning. Easy, right?</p>
-<p>So we are done with our <code>echoProtocol</code> method, good! But we still miss the part of our server that will list for new connections and create <code>Fiber</code>s to attend them. Let's work on that, we implement that functionality in another method that takes as input the <code>java.io.ServerSocket</code> instance that will listen for clients:</p>
+<p>The loop tries to read a line from the client, and if successful then it checks the line content. If empty it finishes the method, if not it sends back the line through the writer and loops back to the beginning. Easy, right :) ?</p>
+<p>So we are done with our <code>echoProtocol</code> method, good! But we still miss the part of our server that will list for new connections and create fibers to attend them. Let's work on that, we implement that functionality in another method that takes as input the <code>java.io.ServerSocket</code> instance that will listen for clients:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">serve</span>(serverSocket: ServerSocket): IO[Unit] = {
   <span class="kw">def</span> <span class="fu">close</span>(socket: Socket): IO[Unit] = 
     IO{ socket.<span class="fu">close</span>() }.<span class="fu">handleErrorWith</span>(_ =&gt; IO.<span class="fu">unit</span>)
@@ -259,78 +291,12 @@ scalacOptions ++= Seq(
     _      &lt;- <span class="fu">serve</span>(serverSocket)         <span class="co">// Looping back to the beginning</span>
   } <span class="kw">yield</span> ()
 }</code></pre></div>
-<p>To be honest, that wasn't that hard either, was it? We invoke the <code>accept()</code> method of the <code>ServerSocket</code> and when a new connection arrives we call the <code>echoProtocol</code> method we defined above to attend it. As client socket instances are created by this method, then it is in charge of closing them once <code>echoProtocol</code> has finished. We do this with the quite handy <code>guarantee</code> call, that ensures that when the <code>IO</code> finishes the functionality inside <code>guarantee</code> is run whatever the outcome was. In this case we ensure closing the socket, ignoring any possible error when closing. Also quite interesting: we use <code>start</code>! By doing so the <code>echoProtocol</code> call will run on its own <code>Fiber</code> thus not blocking the main loop.</p>
-<p>So, what do we miss now? Only the creation of the server socket of course, which we can already do in the <code>run</code> method of an <code>IOApp</code>. So our final server version will look like this:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">package</span> tutorial
-
-<span class="kw">import</span> cats.<span class="fu">effect</span>._
-<span class="kw">import</span> cats.<span class="fu">implicits</span>._
-
-<span class="kw">import</span> java.<span class="fu">io</span>._
-<span class="kw">import</span> java.<span class="fu">net</span>._
-
-<span class="kw">object</span> SimpleServer <span class="kw">extends</span> IOApp {
-
-  <span class="kw">def</span> <span class="fu">echoProtocol</span>(clientSocket: Socket): IO[Unit] = {
-  
-    <span class="kw">def</span> <span class="fu">close</span>(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
-      (IO{reader.<span class="fu">close</span>()}, IO{writer.<span class="fu">close</span>()})
-        .<span class="fu">tupled</span>                        <span class="co">// From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]</span>
-        .<span class="fu">map</span>(_ =&gt; ())                  <span class="co">// From IO[(Unit, Unit)] to IO[Unit]</span>
-        .<span class="fu">handleErrorWith</span>(_ =&gt; IO.<span class="fu">unit</span>) <span class="co">// Swallowing up any possible error</span>
-  
-    <span class="kw">def</span> <span class="fu">loop</span>(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
-      <span class="kw">for</span> {
-        _    &lt;- IO.<span class="fu">cancelBoundary</span>
-        line &lt;- IO{ reader.<span class="fu">readLine</span>() }
-        _    &lt;- line <span class="kw">match</span> {
-                  <span class="kw">case</span> <span class="st">&quot;&quot;</span> =&gt; IO.<span class="fu">unit</span> <span class="co">// Empty line, we are done</span>
-                  <span class="kw">case</span> _  =&gt; IO{ writer.<span class="fu">write</span>(line); writer.<span class="fu">newLine</span>(); writer.<span class="fu">flush</span>() } *&gt; <span class="fu">loop</span>(reader, writer)
-                }
-      } <span class="kw">yield</span> ()
-  
-    <span class="kw">val</span> readerIO = IO{ <span class="kw">new</span> BufferedReader(<span class="kw">new</span> InputStreamReader(clientSocket.<span class="fu">getInputStream</span>())) }
-    <span class="kw">val</span> writerIO = IO{ <span class="kw">new</span> BufferedWriter(<span class="kw">new</span> PrintWriter(clientSocket.<span class="fu">getOutputStream</span>())) }
-  
-    (readerIO, writerIO)
-      .<span class="fu">tupled</span>       <span class="co">// From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]</span>
-      .<span class="fu">bracket</span> {
-        <span class="kw">case</span> (reader, writer) =&gt; <span class="fu">loop</span>(reader, writer)  <span class="co">// Let&#39;s get to work!</span>
-      } {
-        <span class="kw">case</span> (reader, writer) =&gt; <span class="fu">close</span>(reader, writer) <span class="co">// We are done, closing the streams</span>
-      }
-  }
-
-  <span class="kw">def</span> <span class="fu">serve</span>(serverSocket: ServerSocket): IO[Unit] = {
-    <span class="kw">def</span> <span class="fu">close</span>(socket: Socket): IO[Unit] = 
-      IO{ socket.<span class="fu">close</span>() }.<span class="fu">handleErrorWith</span>(_ =&gt; IO.<span class="fu">unit</span>)
-  
-    <span class="kw">for</span> {
-      _      &lt;- IO.<span class="fu">cancelBoundary</span>
-      socket &lt;- IO{ serverSocket.<span class="fu">accept</span>() }
-      _      &lt;- <span class="fu">echoProtocol</span>(socket)
-                  .<span class="fu">guarantee</span>(<span class="fu">close</span>(socket)) <span class="co">// We close the socket whatever happens</span>
-                  .<span class="fu">start</span>                    <span class="co">// Client attended by its own Fiber!</span>
-      _      &lt;- <span class="fu">serve</span>(serverSocket)         <span class="co">// Looping back to the beginning</span>
-    } <span class="kw">yield</span> ()
-  }
-
-  <span class="kw">override</span> <span class="kw">def</span> <span class="fu">run</span>(args: List[String]): IO[ExitCode] = {
-  
-    <span class="kw">def</span> <span class="fu">close</span>(socket: ServerSocket): IO[Unit] =
-      IO{ socket.<span class="fu">close</span>() }.<span class="fu">handleErrorWith</span>(_ =&gt; IO.<span class="fu">unit</span>)
-  
-    IO{ <span class="kw">new</span> ServerSocket(args.<span class="fu">headOption</span>.<span class="fu">map</span>(_.<span class="fu">toInt</span>).<span class="fu">getOrElse</span>(<span class="dv">5432</span>)) }
-      .<span class="fu">bracket</span>{
-        serverSocket =&gt; <span class="fu">serve</span>(serverSocket) *&gt; IO.<span class="fu">pure</span>(ExitCode.<span class="fu">Success</span>)
-      } {
-        serverSocket =&gt; <span class="fu">close</span>(serverSocket) *&gt; IO{ <span class="fu">println</span>(<span class="st">&quot;Server finished&quot;</span>) }
-      }
-  }
-}</code></pre></div>
+<p>To be honest, that wasn't that hard either, was it? We invoke the <code>accept()</code> method of <code>ServerSocket</code> and when a new connection arrives we call the <code>echoProtocol</code> method we defined above to attend it. As client socket instances are created by this method, then it is in charge of closing them once <code>echoProtocol</code> has finished. We do this with the quite handy <code>guarantee</code> call, that ensures that when the <code>IO</code> finishes the functionality inside <code>guarantee</code> is run whatever the outcome was. In this case we ensure closing the socket, ignoring any possible error when closing. Also quite interesting: we use <code>start</code>! By doing so the <code>echoProtocol</code> call will run on its own fiber thus not blocking the main loop. As in the previous example to copy files, we include a call to <code>IO.cancelBoundary</code> so we ensure the loop can be cancelled at each iteration. However let's not mix up this with Java thread <code>interrupt</code> or the like. Calling to <code>cancel</code> on a <code>Fiber</code> instance will not stop it immediately. So in the code above, if the fiber is waiting on <code>accept()</code> then <code>cancel()</code> would not 'unlock' the fiber. Instead the fiber will keep waiting for a connection. Only when the loop iterates again and the <code>cancelBoundary</code> is reached then the fiber will be effectively canceled.</p>
+<p><em>NOTE: If you have coded servers before, probably you are wondering if cats-effect provides some magical way to attend an unlimited number of clients without balancing the load somehow. Truth is, it doesn't. You can spawn as many fibers as you wish, but there is no guarantee they will run simultaneously. More about this in the last section <a href="#fibersarenotthreads">Warning: fibers are not threads!</a></em></p>
+<p>So, what do we miss now? Only the creation of the server socket of course, which we can already do in the <code>run</code> method of an <code>IOApp</code>. So our final server version will look <a href="https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV1_Simple.scala">like this</a>.</p>
 <p>As before you can run in for example from the <code>sbt</code> console just by typing</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">&gt; runMain tutorial.<span class="fu">SimpleServer</span></code></pre></div>
-<p>That will start the server on port <code>5432</code>, you can set any other port by passing it as argument. To test the server is properly running, you can connect to it using <code>telnet</code>. Here we connect, send <code>hi</code> line to check we get the same line as reply, and then send and empty line to close the connection:</p>
+<p>That will start the server on default port <code>5432</code>, you can also set any other port by passing it as argument. To test the server is properly running, you can connect to it using <code>telnet</code>. Here we connect, send <code>hi</code> line to check we get the same line as reply, and then send and empty line to close the connection:</p>
 <pre class="console"><code>$ telnet localhost 5432
 Trying 127.0.0.1...
 Connected to localhost.
@@ -340,11 +306,14 @@ hi
 
 Connection closed by foreign host.</code></pre>
 <p>You can connect several telnet sessions at the same time to verify that indeed our server can attend all of them simultaneously.</p>
-<p>Unfortunately this server is a bit too simplistic. What about halting? Well, that is something we have not addressed yet and it is when things can get a bit more complicated. We will deal with proper server halting in the next section.</p>
-<h2 id="handling-exit-events-in-echo-server">Handling exit events in echo server</h2>
+<p>Unfortunately this server is a bit too simplistic. For example, how can we stop it? Well, that is something we have not addressed yet and it is when things can get a bit more complicated. We will deal with proper server halting in the next section.</p>
+</div>
+<div id="handling-exit-events-in-echo-server-graceful-server-stop" class="section level2">
+<h2>Handling exit events in echo server (graceful server stop)</h2>
 <p>There is no way to shutdown gracefully the echo server coded in the previous version. Sure we can always <code>&lt;Ctrl&gt;-c</code> it, but proper servers should provide better mechanisms to stop them. In this section we use some other <code>cats-effect</code> constructs to deal with this.</p>
-<p>First, we will use a flag to signal when the server shall quit. The server will run on its own <code>Fiber</code>, that will be cancelled when that flag is set. The flag will be an instance of <code>MVar</code>. The <code>cats-effect</code> documentation describes <code>MVar</code> as <em>a mutable location that can be empty or contains a value, asynchronously blocking reads when empty and blocking writes when full</em>. So we will 'block' by reading our <code>MVar</code> instance. And who shall signal that the server must be stopped? In this example, we will assume that it will be the connected users who can request the server to halt by sendind a <code>STOP</code> message. Thus, the method attending clients (<code>echoProtocol</code>!) needs access to the flag.</p>
-<p>Let's first define a new method <code>server</code> that instantiates the flag, runs the <code>serve</code> method in its own <code>Fiber</code> and waits on the flag to be set. Only when the flag is set the server fiber will be canceled.</p>
+<p>First, we will use a flag to signal when the server shall quit. The server will run on its own fiber, that will be canceled when that flag is set. The flag will be an instance of <code>MVar</code>. The <code>cats-effect</code> documentation describes <code>MVar</code> as <em>a mutable location that can be empty or contains a value, asynchronously blocking reads when empty and blocking writes when full</em>. That is what we need, the hability to block! So we will 'block' by reading our <code>MVar</code> instance, and only writing when <code>STOP</code> is received, the write being the <em>signal</em> that the server must be shut down. The server will be only stopped once, so we are not concerned about blocking on writing. Another possible choice would be using <code>cats-effect</code>'s <code>Deferred</code>, but unlike <code>Deferred</code> <code>MVar</code> does allow to peek whether a value was written or not. As we shall see, this will come handy later on.</p>
+<p>And who shall signal that the server must be stopped? In this example, we will assume that it will be the connected users who can request the server to halt by sendind a <code>STOP</code> message. Thus, the method attending clients (<code>echoProtocol</code>!) needs access to the flag.</p>
+<p>Let's first define a new method <code>server</code> that instantiates the flag, runs the <code>serve</code> method in its own fiber and waits on the flag to be set. Only when the flag is set the server fiber will be canceled.</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">server</span>(serverSocket: ServerSocket): IO[ExitCode] = 
   <span class="kw">for</span> {
       stopFlag    &lt;- MVar[IO].<span class="fu">empty</span>[Unit]
@@ -397,102 +366,18 @@ Connection closed by foreign host.</code></pre>
   } <span class="kw">yield</span> ()
 }</code></pre></div>
 <p>This new implementation of <code>serve</code> does not just call <code>accept()</code> inside an <code>IO</code>. It also uses <code>attempt</code>, which returns an instance of <code>Either</code> (<code>Either[Throwable, Socket]</code> in this case). We can then check the value of that <code>Either</code> to verify if the <code>accept()</code> call was successful, and in case of error deciding what to do depending on whether the <code>stopFlag</code> is set or not.</p>
-<p>There is only one step missing, modifying <code>echoLoop</code>. The only relevant changes are two: modifying the signature to pass the <code>stopFlag</code> flag; and in the <code>loop</code> function checking whether the line from the client equals <code>STOP</code>, in such case the flag we will set and the function will be finished. The final code looks as follows:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">package</span> tutorial
-
-<span class="kw">import</span> cats.<span class="fu">effect</span>._
-<span class="kw">import</span> cats.<span class="fu">effect</span>.<span class="fu">concurrent</span>.<span class="fu">MVar</span>
-<span class="kw">import</span> cats.<span class="fu">implicits</span>._
-
-<span class="kw">import</span> java.<span class="fu">io</span>._
-<span class="kw">import</span> java.<span class="fu">net</span>._
-
-<span class="kw">object</span> StoppableServer <span class="kw">extends</span> IOApp {
-
-  <span class="kw">def</span> <span class="fu">echoProtocol</span>(clientSocket: Socket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
-  
-    <span class="kw">def</span> <span class="fu">close</span>(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
-      (IO{reader.<span class="fu">close</span>()}, IO{writer.<span class="fu">close</span>()})
-        .<span class="fu">tupled</span>                        <span class="co">// From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]</span>
-        .<span class="fu">map</span>(_ =&gt; ())                  <span class="co">// From IO[(Unit, Unit)] to IO[Unit]</span>
-        .<span class="fu">handleErrorWith</span>(_ =&gt; IO.<span class="fu">unit</span>) <span class="co">// Swallowing up any possible error</span>
-  
-    <span class="kw">def</span> <span class="fu">loop</span>(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
-      <span class="kw">for</span> {
-        _    &lt;- IO.<span class="fu">cancelBoundary</span>
-        line &lt;- IO{ reader.<span class="fu">readLine</span>() }
-        _    &lt;- line <span class="kw">match</span> {
-                  <span class="kw">case</span> <span class="st">&quot;STOP&quot;</span> =&gt; stopFlag.<span class="fu">put</span>(()) <span class="co">// Returns IO[Unit], which is handy as we are done here</span>
-                  <span class="kw">case</span> <span class="st">&quot;&quot;</span>     =&gt; IO.<span class="fu">unit</span>          <span class="co">// Empty line, we are done</span>
-                  <span class="kw">case</span> _      =&gt; IO{ writer.<span class="fu">write</span>(line); writer.<span class="fu">newLine</span>(); writer.<span class="fu">flush</span>() } *&gt; <span class="fu">loop</span>(reader, writer)
-                }
-      } <span class="kw">yield</span> ()
-
-    <span class="kw">val</span> readerIO = IO{ <span class="kw">new</span> BufferedReader(<span class="kw">new</span> InputStreamReader(clientSocket.<span class="fu">getInputStream</span>())) }
-    <span class="kw">val</span> writerIO = IO{ <span class="kw">new</span> BufferedWriter(<span class="kw">new</span> PrintWriter(clientSocket.<span class="fu">getOutputStream</span>())) }
-  
-    (readerIO, writerIO)
-      .<span class="fu">tupled</span>       <span class="co">// From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]</span>
-      .<span class="fu">bracket</span> {
-        <span class="kw">case</span> (reader, writer) =&gt; <span class="fu">loop</span>(reader, writer)  <span class="co">// Let&#39;s get to work!</span>
-      } {
-        <span class="kw">case</span> (reader, writer) =&gt; <span class="fu">close</span>(reader, writer) <span class="co">// We are done, closing the streams</span>
-      }
-  }
-
-  <span class="kw">def</span> <span class="fu">serve</span>(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
-
-    <span class="kw">def</span> <span class="fu">close</span>(socket: Socket): IO[Unit] = 
-      IO{ socket.<span class="fu">close</span>() }.<span class="fu">handleErrorWith</span>(_ =&gt; IO.<span class="fu">unit</span>)
-
-    <span class="kw">for</span> {
-      _       &lt;- IO.<span class="fu">cancelBoundary</span>
-      socketE &lt;- IO{ serverSocket.<span class="fu">accept</span>() }.<span class="fu">attempt</span>
-      _       &lt;- socketE <span class="kw">match</span> {
-        <span class="kw">case</span> <span class="fu">Right</span>(socket) =&gt;
-          <span class="kw">for</span> { <span class="co">// accept() succeeded, we attend the client in its own Fiber</span>
-            _ &lt;- <span class="fu">echoProtocol</span>(socket, stopFlag)
-                   .<span class="fu">guarantee</span>(<span class="fu">close</span>(socket))   <span class="co">// We close the server whatever happens</span>
-                   .<span class="fu">start</span>                      <span class="co">// Client attended by its own Fiber</span>
-            _ &lt;- <span class="fu">serve</span>(serverSocket, stopFlag) <span class="co">// Looping back to the beginning</span>
-          } <span class="kw">yield</span> ()
-        <span class="kw">case</span> <span class="fu">Left</span>(e) =&gt;
-          <span class="kw">for</span> { <span class="co">// accept() failed, stopFlag will tell us whether this is a graceful shutdown</span>
-            isEmpty &lt;- stopFlag.<span class="fu">isEmpty</span>
-            _       &lt;- <span class="kw">if</span>(!isEmpty) IO.<span class="fu">unit</span>    <span class="co">// stopFlag is set, nothing to do</span>
-                       <span class="kw">else</span> IO.<span class="fu">raiseError</span>(e)   <span class="co">// stopFlag not set, must raise error</span>
-          } <span class="kw">yield</span> ()
-      }
-    } <span class="kw">yield</span> ()
-  }
-
-  <span class="kw">def</span> <span class="fu">server</span>(serverSocket: ServerSocket): IO[ExitCode] = 
-    <span class="kw">for</span> {
-      stopFlag    &lt;- MVar[IO].<span class="fu">empty</span>[Unit]
-      serverFiber &lt;- <span class="fu">serve</span>(serverSocket, stopFlag).<span class="fu">start</span>
-      _           &lt;- stopFlag.<span class="fu">read</span>
-      _           &lt;- serverFiber.<span class="fu">cancel</span>
-    } <span class="kw">yield</span> ExitCode.<span class="fu">Success</span>
-
-  <span class="kw">override</span> <span class="kw">def</span> <span class="fu">run</span>(args: List[String]): IO[ExitCode] = {
-
-    <span class="kw">def</span> <span class="fu">close</span>(socket: ServerSocket): IO[Unit] =
-      IO{ socket.<span class="fu">close</span>() }.<span class="fu">handleErrorWith</span>(_ =&gt; IO.<span class="fu">unit</span>)
-
-    IO{ <span class="kw">new</span> ServerSocket(args.<span class="fu">headOption</span>.<span class="fu">map</span>(_.<span class="fu">toInt</span>).<span class="fu">getOrElse</span>(<span class="dv">5432</span>)) }
-      .<span class="fu">bracket</span> {
-        serverSocket =&gt; <span class="fu">server</span>(serverSocket) *&gt; IO.<span class="fu">pure</span>(ExitCode.<span class="fu">Success</span>)
-      } {
-        serverSocket =&gt; <span class="fu">close</span>(serverSocket)  *&gt; IO{ <span class="fu">println</span>(<span class="st">&quot;Server finished&quot;</span>) }
-      }
-  }
-}</code></pre></div>
+<p>There is only one step missing, modifying <code>echoLoop</code>. The only relevant changes are two: modifying the signature to pass the <code>stopFlag</code> flag; and in the <code>loop</code> function checking whether the line from the client equals <code>STOP</code>, in such case the flag we will set and the function will be finished. The final code looks <a href="https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV2_GracefulStop.scala">like this</a>.</p>
 <p>If you run the server coded above, open a telnet session against it and send an <code>STOP</code> message you will see how the server finishes properly.</p>
-<p>But there is a catch yet. If there are several clients connected, sending an <code>STOP</code> message will close the server's <code>Fiber</code> and the one attending the client that sent the message. But the other <code>Fiber</code>s will keep running normally! It is like they were daemon threads. Arguably, we could expect that shutting down the server shall close <em>all</em> connections. How could we do it? Solving that issue is the proposed final exercise below.</p>
-<h2 id="final-exercise">Final exercise</h2>
-<p>We need to close all connections with clients when the server is shut down. To do that we can call <code>cancel</code> on each one of the <code>Fiber</code> instances we have created to attend each new client. But how? After all, we are not tracking which <code>Fiber</code>s are running at any given time.</p>
-<p>We could keep a list of active <code>Fiber</code>s serving client connections. It is doable, but cumbersome... and not really needed at this point.</p>
-<p>Think about it: we have a <code>stopFlag</code> that signals when the server must be stopped. When that flag is set we can assume we shall close all client connections too. Thus what we need to do is, every time we create a new <code>Fiber</code> to attend some new client, we must also make sure that when <code>stopFlag</code> is set that <code>Fiber</code> is cancelled. As <code>Fiber</code> instances are very light we can create a new instance just to wait for <code>stopFlag.read</code> and then cancelling the client's own <code>Fiber</code>. This is how the <code>serve</code> method will look like now with that change:</p>
+<p>But there is a catch yet. If there are several clients connected, sending an <code>STOP</code> message will close the server's fiber and the one attending the client that sent the message. But the other fibers will keep running normally! It is like they were daemon threads. Arguably, we could expect that shutting down the server shall close <em>all</em> connections. How could we do it? Solving that issue is the proposed final exercise below.</p>
+</div>
+<div id="closing-client-connections-to-echo-server-on-shutdown-exercise" class="section level2">
+<h2>Closing client connections to echo server on shutdown (exercise)</h2>
+<p>We need to close all connections with clients when the server is shut down. To do that we can call <code>cancel</code> on each one of the <code>Fiber</code> instances we have created to attend each new client. But how? After all, we are not tracking which fibers are running at any given time. We propose this exercise to you: can you devise a mechanism so all client connections are closed when the server is shutdown? We propose a solution in the next subsection, but maybe you can consider taking some time looking for a solution :) .</p>
+</div>
+<div id="solution" class="section level2">
+<h2>Solution</h2>
+<p>We could keep a list of active fibers serving client connections. It is doable, but cumbersome... and not really needed at this point.</p>
+<p>Think about it: we have a <code>stopFlag</code> that signals when the server must be stopped. When that flag is set we can assume we shall close all client connections too. Thus what we need to do is, every time we create a new fiber to attend some new client, we must also make sure that when <code>stopFlag</code> is set that client is 'shutdown'. As <code>Fiber</code> instances are very light we can create a new instance just to wait for <code>stopFlag.read</code> and then forcing the client to stop. This is how the <code>serve</code> method will look like now with that change:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">serve</span>(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
 
   <span class="kw">def</span> <span class="fu">close</span>(socket: Socket): IO[Unit] = 
@@ -505,43 +390,158 @@ Connection closed by foreign host.</code></pre>
       <span class="kw">case</span> <span class="fu">Right</span>(socket) =&gt;
         <span class="kw">for</span> { <span class="co">// accept() succeeded, we attend the client in its own Fiber</span>
           fiber &lt;- <span class="fu">echoProtocol</span>(socket, stopFlag)
-                     .<span class="fu">guarantee</span>(<span class="fu">close</span>(socket))     <span class="co">// We close the server whatever happens</span>
-                     .<span class="fu">start</span>                        <span class="co">// Client attended by its own Fiber</span>
-          _     &lt;- (stopFlag.<span class="fu">read</span> *&gt; fiber.<span class="fu">cancel</span>)
-                     .<span class="fu">start</span>                        <span class="co">// Another Fiber to cancel the client when stopFlag is set</span>
-          _     &lt;- <span class="fu">serve</span>(serverSocket, stopFlag)   <span class="co">// Looping back to the beginning</span>
+                     .<span class="fu">guarantee</span>(<span class="fu">close</span>(socket))      <span class="co">// We close the server whatever happens</span>
+                     .<span class="fu">start</span>                         <span class="co">// Client attended by its own Fiber</span>
+          _     &lt;- (stopFlag.<span class="fu">read</span> *&gt; <span class="fu">close</span>(socket)) 
+                     .<span class="fu">start</span>                         <span class="co">// Another Fiber to cancel the client when stopFlag is set</span>
+          _     &lt;- <span class="fu">serve</span>(serverSocket, stopFlag)    <span class="co">// Looping to wait for the next client connection</span>
         } <span class="kw">yield</span> ()
       <span class="kw">case</span> <span class="fu">Left</span>(e) =&gt;
         <span class="kw">for</span> { <span class="co">// accept() failed, stopFlag will tell us whether this is a graceful shutdown</span>
           isEmpty &lt;- stopFlag.<span class="fu">isEmpty</span>
-          _       &lt;- <span class="kw">if</span>(!isEmpty) IO.<span class="fu">unit</span>  <span class="co">// stopFlag is set, nothing to do</span>
+          _       &lt;- <span class="kw">if</span>(!isEmpty) IO.<span class="fu">unit</span>  <span class="co">// stopFlag is set, cool, we are done</span>
                      <span class="kw">else</span> IO.<span class="fu">raiseError</span>(e) <span class="co">// stopFlag not set, must raise error</span>
         } <span class="kw">yield</span> ()
     }
   } <span class="kw">yield</span> ()
-  }</code></pre></div>
-<p>But note that when client socket is closed an exception will be raised by the <code>reader.readLine()</code> call in the <code>loop</code> method of <code>echoProtocol</code>. As it happened before with the server socket, the exception will be shown as an ugly error message in the console. To prevent this we modify the <code>loop</code> function so it uses <code>attempt</code> to control possible errors. If some error is detected first the state of <code>stopFlag</code> is checked, and if it is set a graceful shutdown is assumed and no action is taken; otherwise the error is raised:</p>
-<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">loop</span>(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
+}</code></pre></div>
+<p>Now you may think '<em>wait a minute!, why don't cancelling the client fiber instead of closing the socket straight away?</em>'. Well, recall what we said before, cancellation will not have effect until the <code>cancelableBoundary</code> is reached. That means that a new iteration would be needed, that is, some data shall be read from the incoming socket (see <code>echoProtocol</code> code). To force the termination even when the reader is waiting for input data we close the client socket. That will raise an exception in the <code>reader.readLine()</code> line. As it happened before with the server socket, that exception will be shown as an ugly error message in the console. To prevent this we modify the <code>loop</code> function so it uses <code>attempt</code> to control possible errors. If some error is detected first the state of <code>stopFlag</code> is checked, and if it is set a graceful shutdown is assumed and no action is taken; otherwise the error is raised:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">loop</span>(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
   <span class="kw">for</span> {
     _     &lt;- IO.<span class="fu">cancelBoundary</span>
     lineE &lt;- IO{ reader.<span class="fu">readLine</span>() }.<span class="fu">attempt</span>
     _     &lt;- lineE <span class="kw">match</span> {
                <span class="kw">case</span> <span class="fu">Right</span>(line) =&gt; line <span class="kw">match</span> {
-                 <span class="kw">case</span> <span class="st">&quot;STOP&quot;</span> =&gt; stopFlag.<span class="fu">put</span>(()) <span class="co">// Returns IO[Unit], which is handy as we are done here</span>
+                 <span class="kw">case</span> <span class="st">&quot;STOP&quot;</span> =&gt; stopFlag.<span class="fu">put</span>(()) <span class="co">// Stopping server! Also put(()) returns IO[Unit] which is handy as we are done</span>
                  <span class="kw">case</span> <span class="st">&quot;&quot;</span>     =&gt; IO.<span class="fu">unit</span>          <span class="co">// Empty line, we are done</span>
                  <span class="kw">case</span> _      =&gt; IO{ writer.<span class="fu">write</span>(line); writer.<span class="fu">newLine</span>(); writer.<span class="fu">flush</span>() } *&gt; <span class="fu">loop</span>(reader, writer)
                }
                <span class="kw">case</span> <span class="fu">Left</span>(e) =&gt;
                  <span class="kw">for</span> { <span class="co">// readLine() failed, stopFlag will tell us whether this is a graceful shutdown</span>
                    isEmpty &lt;- stopFlag.<span class="fu">isEmpty</span>
-                   _       &lt;- <span class="kw">if</span>(!isEmpty) IO.<span class="fu">unit</span>  <span class="co">// stopFlag is set, nothing to do</span>
+                   _       &lt;- <span class="kw">if</span>(!isEmpty) IO.<span class="fu">unit</span>  <span class="co">// stopFlag is set, cool, we are done</span>
                               <span class="kw">else</span> IO.<span class="fu">raiseError</span>(e) <span class="co">// stopFlag not set, must raise error</span>
                  } <span class="kw">yield</span> ()
              }
   } <span class="kw">yield</span> ()</code></pre></div>
+<p>The resulting server code is <a href="https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV3_ClosingClientsOnShutdown">also available</a>.</p>
 <p>There are many other improvements that can be applied to this code, like for example modifying <code>serve</code> so instead of using a hardcoded call to <code>echoProtocol</code> it calls to some method passed as parameter. That way the same function could be used for any protocol! Signature would be something like:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">serve</span>(serverSocket: ServerSocket, protocol: (Socket, MVar[IO, Unit]) =&gt; IO[Unit], stopFlag: MVar[IO, Unit]): IO[Unit] = ???</code></pre></div>
 <p>After modifying <code>serve</code> code we would only need to change <code>server</code> so it includes the protocol to use in its call to <code>serve</code>.</p>
-<p>And what about trying to develop different protocols!?</p>
+<p>And what about trying to develop different protocols!? We let to your imagination how to expand this quite simple server with cats-effect lib. But first take a look to the next sections, it may give you more ideas ;)</p>
+</div>
+<div id="warning-fibers-are-not-threads" class="section level2">
+<h2>Warning: fibers are not threads!<a name="fibersarenotthreads"></a></h2>
+<p>As stated before, fibers are like 'light' threads, meaning they can be used in a similar way than threads to create concurrent code. However, they are <em>not</em> threads. Spawning new fibers does not guarantee that the action described in the <code>IO</code> associated to it will be run... immediately. At the end of the day, if no thread is available that can run the fiber, then the actions in that fiber will be blocked until some thread is available.</p>
+<p>You can test this yourself. Start the server defined in the previous sections and try to connect several clients (let's say 12). Soon you will notice that the latest clients... do not get any echo reply when sending lines! Why is that? Well, the answer is that the first fibers already used all <em>underlying</em> threads available! But if we close one of the active clients by sending an empty line (recall that makes the server to close that client session) then immediately one of the blocked clients will be active.</p>
+<p>It shall be clear from that experiment than fibers are run by thread pools. And that in our case, all our fibers share the same thread pool! Which one in our case? Well, <code>IOApp</code> automatically brings a <code>Timer[IO]</code>, that is defined by cats-effect as a '<em>functional equivalente of Java's <a href="https://docs.oracle.com/javase/9/docs/api/java/util/concurrent/ScheduledExecutorService.html">ScheduledExecutorService</a></em>'. Each executor service has an underlying thread pool to execute the commands it is requested, and the same applies to <code>Timer</code>, which is in charge of assigning available threads to the pending <code>IO</code> actions. So there are our threads!</p>
+<p>Cats-effect provides ways to use different <code>scala.concurrent.ExecutionContext</code>s, each one with its own thread pool, and to swap which one should be used for each new <code>IO</code>, to ask to reschedule threads among the current active <code>IO</code> instances, for improved fairness etc. Such functionality is provided by <code>IO.shift</code>. Also, it even allows to 'swap' to different <code>Timer</code>s (that is, different thread pools) when running <code>IO</code> actions. See this code, which is mostly a copy example available at <a href="https://typelevel.org/cats-effect/datatypes/io.html#thread-shifting">IO documentation in cats-effect web, Thread Shifting section</a>:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">import</span> java.<span class="fu">util</span>.<span class="fu">concurrent</span>.<span class="fu">Executors</span>
+
+<span class="kw">import</span> scala.<span class="fu">concurrent</span>.<span class="fu">ExecutionContext</span>
+
+<span class="kw">val</span> cachedThreadPool = Executors.<span class="fu">newCachedThreadPool</span>()
+<span class="kw">val</span> clientsExecutionContext = ExecutionContext.<span class="fu">fromExecutor</span>(cachedThreadPool)
+<span class="kw">implicit</span> <span class="kw">val</span> Main = ExecutionContext.<span class="fu">global</span>
+
+<span class="kw">for</span> {
+  _ &lt;- IO.<span class="fu">shift</span>(clientsExecutionContext) <span class="co">// Swapping to cached thread pool</span>
+  _ &lt;- IO{} <span class="co">// Whatever is done here, is done by a thread from the cached thread pool</span>
+  _ &lt;- IO.<span class="fu">shift</span> 
+  _ &lt;- <span class="fu">IO</span>(<span class="fu">println</span>(s<span class="st">&quot;Welcome $name!&quot;</span>)) <span class="co">// Swapping back to default timer</span>
+  _ &lt;- <span class="fu">IO</span>(cachedThreadPool.<span class="fu">shutdown</span>())
+} <span class="kw">yield</span> ()</code></pre></div>
+<p><code>IO.shift</code> is a powerful tool but can be a bit confusing to beginners (and even intermediate) users of cats-effect. So do not worry if it takes some time for you to master.</p>
+</div>
+<div id="using-a-custom-thread-pool-in-echo-server-exercise" class="section level2">
+<h2>Using a custom thread pool in Echo server (exercise)</h2>
+<p>Given what we know so far, how could we solve the problem of the limited number of clients attended in parallel in our Echo server? Recall that in traditional servers we would make use of an specific thread pool for clients, able to resize in case more threads are needed. You can get such a pool using <code>Executors.newCachedThreadPool()</code> as in the example of the previous section. But take care of shutting it down when the server is stopped!</p>
+</div>
+<div id="solution-1" class="section level2">
+<h2>Solution</h2>
+<p>Well, the solution is quite straighforward. We only need to create a thread pool and execution context, and use it whenever we need to read input from some connected client. So the beginning of the <code>loop</code> function would look like:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">for</span>{
+  _     &lt;- IO.<span class="fu">cancelBoundary</span>
+  _     &lt;- IO.<span class="fu">shift</span>(clientsExecutionContext)
+  lineE &lt;- IO{ reader.<span class="fu">readLine</span>() }.<span class="fu">attempt</span>
+  _     &lt;- IO.<span class="fu">shift</span>(ExecutionContext.<span class="fu">global</span>)
+  <span class="co">//</span></code></pre></div>
+<p>and... that is mostly it. Only pending change is to create the thread pool and execution context in the <code>server</code> function, which will be in charge also of shutting down the thread pool when the server finishes:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">def</span> <span class="fu">server</span>(serverSocket: ServerSocket): IO[ExitCode] = {
+
+  <span class="kw">val</span> clientsThreadPool = Executors.<span class="fu">newCachedThreadPool</span>()
+  <span class="kw">implicit</span> <span class="kw">val</span> clientsExecutionContext = ExecutionContext.<span class="fu">fromExecutor</span>(clientsThreadPool)
+
+  <span class="kw">for</span> {
+    stopFlag     &lt;- MVar[IO].<span class="fu">empty</span>[Unit]
+    serverFiber  &lt;- <span class="fu">serve</span>(serverSocket, stopFlag).<span class="fu">start</span>
+    _            &lt;- stopFlag.<span class="fu">read</span> *&gt; IO{<span class="fu">println</span>(s<span class="st">&quot;Stopping server&quot;</span>)}
+    _            &lt;- IO{clientsThreadPool.<span class="fu">shutdown</span>()}
+    _            &lt;- serverFiber.<span class="fu">cancel</span>
+  } <span class="kw">yield</span> ExitCode.<span class="fu">Success</span>
+
+}</code></pre></div>
+<p>Signatures of <code>serve</code> and of <code>echoProtocol</code> will have to be changed too to pass the execution context as parameter. The resulting server code is <a href="https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV4_ClientThreadPool">available in github</a>.</p>
+</div>
+<div id="lets-not-forget-about-async" class="section level2">
+<h2>Let's not forget about async</h2>
+<p>The <code>async</code> functionality is another powerful capability of cats-effect we have not mentioned yet. It allows to build <code>IO</code> instances that may be terminated by a thread different than the one carrying the evaluation of that instance. Result will be returned by using a callback.</p>
+<p>Some of you can wonder if that could help us to solve the issue of having blocking code in our fabolous echo server. Thing is, <code>async</code> cannot magically 'unblock' such code. Try this simple snippet:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">import</span> cats.<span class="fu">effect</span>.<span class="fu">IO</span>
+<span class="kw">import</span> cats.<span class="fu">implicits</span>._
+
+<span class="kw">import</span> scala.<span class="fu">util</span>.<span class="fu">Either</span>
+
+<span class="kw">for</span> {
+  _ &lt;- <span class="fu">IO</span>(<span class="fu">println</span>(<span class="st">&quot;Starting&quot;</span>))
+  _ &lt;- IO.<span class="fu">async</span>[Unit]{ (cb: Either[Throwable,Unit] =&gt; Unit) =&gt;
+      Thread.<span class="fu">sleep</span>(<span class="dv">2000</span>)
+      <span class="fu">cb</span>(<span class="fu">Right</span>(()))
+    }
+  _ &lt;- <span class="fu">IO</span>(<span class="fu">println</span>(<span class="st">&quot;Done&quot;</span>)) <span class="co">// 2 seconds to get here, no matter what</span>
+} <span class="kw">yield</span>()</code></pre></div>
+<p>You will notice that the code still blocks. So how is <code>async</code> useful? Well, because it allows a different thread to finish the task, we can modify the blocking read call inside the <code>loop</code> function of our server with something like:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">for</span> {
+  _     &lt;- IO.<span class="fu">cancelBoundary</span>
+  lineE &lt;- IO.<span class="fu">async</span>{ (cb: Either[Throwable, Either[Throwable, String]] =&gt; Unit) =&gt; 
+             clientsExecutionContext.<span class="fu">execute</span>(<span class="kw">new</span> Runnable {
+               <span class="kw">override</span> <span class="kw">def</span> <span class="fu">run</span>(): Unit = {
+                 <span class="kw">val</span> result: Either[Throwable, String] = Try{ reader.<span class="fu">readLine</span>() }.<span class="fu">toEither</span>
+                 <span class="fu">cb</span>(<span class="fu">Right</span>(result))
+               }
+             })
+           }
+<span class="co">// ...           </span></code></pre></div>
+<p>Notice that the call <code>clientsExecutionContext.execute</code> will create a thread from that execution context, setting free on the other hand the thread that was evaluating the <code>IO</code> for-comprehension. If the thread pool used by the execution context can create new threads if no free ones are available, then we will be able to attend as many clients as needed. This is similar to the solution we used previously shifting the task to the execution context! And in fact <code>shift</code> makes something close to what we have just coded: it introduces asynchronous boundaries to reorganize how threads are used.</p>
+<p>The <code>async</code> construct is useful specially when the task to run by the <code>IO</code> can be terminated by any thread. For example, calls to remote services are often modelled with <code>Future</code>s so they do not block the calling thread. When defining our <code>IO</code>, should we block on the <code>Future</code> waiting for the result? No! We can wrap the call in an <code>async</code> call like:</p>
+<div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala">IO.<span class="fu">async</span>[String]{ (cb: Either[Throwable, String] =&gt; Unit) =&gt; 
+  service.<span class="fu">getSomething</span>().<span class="fu">onCompleted</span> {
+    <span class="kw">case</span> <span class="fu">Success</span>(s) =&gt; <span class="fu">cb</span>(<span class="fu">Right</span>(s))
+    <span class="kw">case</span> <span class="fu">Failure</span>(e) =&gt; <span class="fu">cb</span>(<span class="fu">Left</span>(e))
+  }
+}</code></pre></div>
+<p>So, our aim is to create an echo server that does not require a thread per connected socket to wait on the blocking <code>read()</code> method. If we use a network library that avoids or at limits blocking operations, we could then combine that with <code>async</code> to create such non-blocking server.</p>
+<p>While Java NIO does have some blocking method (<code>Selector</code>'s <code>select()</code>), it allows to build servers that do not require a thread per connected client: <code>select()</code> will return those 'channels' (such as <code>SochetChannel</code>) that have data available to read from, then processing of the incoming data can be split among threads of a size-bounded pool. This way, a thread-per-client approach is not needed. Java NIO2 follows a different philosophy than NIO, and it is arguably more complex to handle.</p>
+</div>
+<div id="conclusion" class="section level2">
+<h2>Conclusion</h2>
+<p>With all this we have covered a good deal of what cats-effect has to offer. Maybe you think it is a bit cumbersome to use? Not really, given the power of the constructs it brings and, above all, the ability to operate with our code side effects in a purely functional manner. Enjoy the ride!</p>
+</div>
+</div>
+
+<!-- page content ends here -->
+
+</div>     <!-- pure-u-1... -->
+</div>     <!-- pure-g -->
+</section> <!-- page-content -->
+<div class="pure-g">
+<footer><a href="https://bitfragment.github.io/mindoc">mindoc</a> v1.1.0</footer>
+</div>
+<script>
+var mindoc=function(){function e(e){return e=e.toLowerCase(),e.charAt(0).toUpperCase()+e.substr(1)}function n(e){var n=new RegExp(/^\b[a-z]\S+\b-\b\S+\b/);return n.test(e)&&(e=e.replace(/-+/g," ")),e}function t(t){return t=n(t),e(t)}function r(e,n){return!!e.className.match(new RegExp("(\\s|^)"+n+"(\\s|)"))}function a(e,n){r(e,n)||(e.className+=" "+n)}function o(e,n){if(r(e,n)){var t=new RegExp("(\\s|^)"+n+"(\\s|)");e.className=e.className.replace(t," ")}}function u(){var e,n,t={table:"pure-table pure-table-bordered"};Object.keys(t).forEach(function(r){if(e=document.getElementsByTagName(r),n=e.length,n>1)for(var o=0;n>o;o++)a(e[o],t[r])})}function c(e,n){for(var t=0,r=e.length;r>t;t++)for(var a=e[t].getElementsByTagName("a"),u=0,c=a.length;c>u;u++)a[u].addEventListener("click",function(){o(n,"hidden")})}function i(e,n){for(var t=0,r=e.length;r>t;t++)e[t].addEventListener("click",function(){o(n,"hidden")})}function d(){var e=document.createElement("li");return a(e,"pure-menu-item"),e}function l(e){var n=document.createElement("a");return n.id="menu-"+e,n.href="#",n.innerHTML=t(e),a(n,"pure-menu-link"),n}function m(e){var n=document.createDocumentFragment(),t=document.createElement("nav"),r=document.createElement("div"),o=document.createElement("ul");n.appendChild(t),t.appendChild(r),r.appendChild(o),a(r,"pure-menu"),a(o,"pure-menu-list");var u="All sections",c=d();a(c,"pure-menu-selected"),o.appendChild(c),c.appendChild(l(u));for(var i,m,s=0,f=e.length;f>s;s++)i=e[s].getAttribute("id"),m=d(),o.appendChild(m),m.appendChild(l(i));var p=document.getElementById("page-content");document.querySelector("body").insertBefore(n,p)}function s(e){var n;e.hasAttribute("pure-menu-selected")||(n=document.querySelector(".pure-menu-selected"),o(n,"pure-menu-selected"),a(e,"pure-menu-selected"))}function f(e,n){var t,u=n.getAttribute("id"),c=u.replace(/menu-/,""),i=document.getElementById(u).parentNode;s(i);for(var d in e)t=e[d],r(t,"hidden")||a(t,"hidden"),t.getAttribute("id")===c&&r(t,"hidden")&&o(t,"hidden")}function p(e){var n;for(var t in e)n=e[t],r(n,"hidden")&&o(n,"hidden")}function v(e){for(var n=document.querySelectorAll(".pure-menu-link"),t=0,r=n.length;r>t;t++)0===t?n[t].addEventListener("click",function(){p(e)}):n[t].addEventListener("click",function(){f(e,this)})}return{main:function(){if(u(),document.getElementsByClassName("level2").length>0){var e,n=[];["abstract","level2","footnotes"].forEach(function(t){e=document.getElementsByClassName(t);for(var r=0,a=e.length;a>r;r++)n.push(e[r])});var t;for(var o in n)t=n[o],r(t,"level2")||a(t,"level2"),r(t,"footnotes")&&t.setAttribute("id","footnotes");m(n),v(n);var d=document.getElementsByClassName("citation"),l=document.getElementById("references");c(d,l);var s=document.getElementsByClassName("footnoteRef"),f=document.getElementById("footnotes");i(s,f)}}}}();window.addEventListener("load",function(){mindoc.main()});
+</script>
+
+<!-- For debugging local scripts -->
+<!-- <script src="../build/mindoc.js"></script> -->
 </body>
 </html>

@@ -8,6 +8,8 @@ import cats.implicits._
 import scala.concurrent.duration._
 import scala.util.Right
 
+import java.io._
+
 object AsyncTest extends IOApp {
 
   def printCurrentThread(): Unit = println(s"Thread > ${Thread.currentThread().getName}")
@@ -65,5 +67,40 @@ object CancelTest extends IOApp {
       _     <- cancellerIO(fiber, 4.seconds)
     } yield ExitCode.Success
 
+}
 
+object ResourceTest extends IOApp {
+
+  def openToRead(f: File): Resource[IO, BufferedReader] = {
+    Resource.make{
+      IO{println("Opening reader")} *> IO{new BufferedReader(new FileReader(f))}
+    } { reader =>
+      IO{println("Closing reader")} *> IO{reader.close()}
+    }
+  }
+
+  def openToWrite(f: File): Resource[IO, BufferedWriter] = {
+    Resource.make{
+      IO{println("Opening writer")} *> IO{new BufferedWriter(new FileWriter(f))}
+    } { writer =>
+      IO{println("Closing writer")} *> IO{writer.close()}
+    }
+  }
+
+  def open(fIn: File, fOut: File): Resource[IO, (BufferedReader, BufferedWriter)] =
+    for {
+      in  <- openToRead(fIn)
+      out <- openToWrite(fOut)
+    } yield (in, out)
+
+  override def run(args: List[String]): IO[ExitCode] =
+    for {
+      _    <- if(args.length < 2) IO.raiseError(new IllegalArgumentException("Need origin and destination files"))
+                else IO.unit
+      orig <- IO.pure(new File(args(0)))
+      dest <- IO.pure(new File(args(1)))
+      _    <- open(orig, dest).use { case(in, out) =>
+                IO{println("Got in and out")}
+              }
+    } yield ExitCode.Success
 }

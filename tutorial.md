@@ -2,7 +2,7 @@ Cats-effect tutorial
 ====================
 [Cats-effect](https://typelevel.org/cats-effect), the effects library for
 [Cats](https://typelevel.org/cats), has a complete documentation explaining the
-types it brings, full with small examples on how to use them. However, even
+types it brings, full with small examples about how to use them. However, even
 with that documentation available, it can be a bit daunting start using the
 library for the first time.
 
@@ -13,9 +13,9 @@ TCP server whose complexity will grow as we introduce more requirements. That
 growing complexity will help us to introduce more and more concepts from
 cats-effect.
 
-The code examples in this tutorial assume some familiarity with scala and maybe
-with cats... but really not that much :) . All code files along with this
-tutorial text are avialable at [this Github
+The code examples in this tutorial assume some familiarity with scala and with
+cats... but really not that much :) . All code files along with this tutorial
+text are avialable at [this Github
 repo](https://github.com/lrodero/cats-effect-tutorial).
 
 That said, let's go!
@@ -47,7 +47,6 @@ scalacOptions ++= Seq(
 The [Github repo for this
 tutorial](https://github.com/lrodero/cats-effect-tutorial) also uses that same
 `build.sbt` file.
-
 
 Warming up: Copying contents of a file
 --------------------------------------
@@ -83,8 +82,8 @@ import java.io._
 
 
 def copy(origin: File, destination: File): IO[Long] = {
-  val inIO: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
-  val outIO:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
+  val inIO: IO[InputStream]  = IO{ new FileInputStream(origin) }
+  val outIO:IO[OutputStream] = IO{ new FileOutputStream(destination) }
 
   ???
 }
@@ -108,12 +107,12 @@ import java.io._
 def transfer(origin: InputStream, destination: OutputStream): IO[Long] = ???
 
 def copy(origin: File, destination: File): IO[Long] = {
-  val inIO: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
-  val outIO:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
+  val inIO: IO[InputStream]  = IO{ new FileInputStream(origin) }
+  val outIO:IO[OutputStream] = IO{ new FileOutputStream(destination) }
 
-  (inIO, outIO)              // Stage 1: Getting resources 
+  (inIO, outIO) 
     .tupled                  // From (IO[InputStream], IO[OutputStream]) to IO[(InputStream, OutputStream)]
-    .bracket{
+    .bracket{                // Stage 1: Getting resources 
       case (in, out) =>
         transfer(in, out)    // Stage 2: Using resources (for copying data, in this case)
     } {
@@ -134,18 +133,6 @@ to do save maybe showing a warning message. Finally we chain the closing action
 using `*>` call to return an `IO.unit` after closing (note that `*>` is cats
 sugar syntax, it's like using `flatMap` but the second step does not need as
 input the output from the first).
-
-_**WARNING**: Stage 2 and stage 3 can happen simultaneously! This is due to
-cats-effect cancellation mechanism: some `IO` instances can be cancellable,
-meaning than its evaluation can be, let's say, 'interrupted'. If an `IO` created
-with `bracket` is cancelled, then its release stage is called. If the
-cancellation is done by a thread that is not the one evaluating the `IO`
-instance, then the release stage will be executed at the same time than the
-usage stage! That can lead to data corruption. We assume that will not be the
-case in our code here, but take that into account when coding your own guarded
-`IO` instances. For more info, see [Gotcha: Cancellation is a concurrent
-action](https://typelevel.org/cats-effect/datatypes/io.html#gotcha-cancellation-is-a-concurrent-action)
-in cats-effect site._
 
 For the sake of clarity, the actual construction of the `IO` performing the
 actual data copying (the _usage_ stage in this case) will be done by a different
@@ -189,73 +176,133 @@ actual transference of data we aim for. But it is a good policy, as it marks
 where the `IO` evaluation will be stopped (cancelled) if requested. In this case,
 at the beginning of each iteration.
 
+Still, there is a catch in our code: stage 2 and stage 3 can happen
+simultaneously! This is due to cats-effect cancellation mechanism. Now,
+cancellation is a cats-effect feature, powerful but non trivial. In cats-effect,
+some `IO` instances can be cancellable, meaning than their evaluation will be
+aborted and, possibly, an alternative `IO` task will be run for example to deal
+with potential cleaning up activities. We will se how an `IO` can be
+actually cancelled at the end of the [Warning: fibers are not threads!
+section](#warning-fibers-are-not-threads), but for now we will just keep 
+
+If an `IO` created with `bracket` is cancelled, in fact it will be the `IO` in
+stage 2 which will be cancelled, while its release stage will be called to deal
+with the cancellation. If at the same time the `IO` is being evaluated then both
+usae and release will happen simultaneously. In certain cases that can lead to
+data corruption, e.g. closing a file when at the same time writing on it. For
+more info, see [Gotcha: Cancellation is a concurrent
+action](https://typelevel.org/cats-effect/datatypes/io.html#gotcha-cancellation-is-a-concurrent-action)
+in cats-effect site.
+
+To prevent such corruption we must use some concurrency control mechanism that
+ensures only one of both `IO` instances are running at any given time. Cats
+effect provides several constructs for concurrency, for this case we will use a
+[_semaphore_](https://typelevel.org/cats-effect/concurrency/semaphore.html). A
+semaphore has a number of permits, its method `adquire` blocks if no permit is
+available until `release` is called on the same semaphore. We will use a
+semaphore with a single permit, along with a new function `close` that will
+close the stream, defined outside `copy` for the sake of readability.
+
+```scala
+import cats.effect.IO
+import cats.effect.concurrent.Semaphore
+import cats.implicits._ 
+import java.io._ 
+
+def close(is: InputStream): IO[Unit] =
+  IO{is.close()}.handleErrorWith(_ => IO.unit) // Swallowing error on close
+
+def close(os: OutputStream): IO[Unit] =
+  IO{os.close()}.handleErrorWith(_ => IO.unit) // Swallowing error on close
+
+def copy(origin: File, destination: File): IO[Long] = {
+  val inIO: IO[InputStream]   = IO{ new FileInputStream(origin) }
+  val outIO:IO[OutputStream]  = IO{ new FileOutputStream(destination) }
+  val semph:IO[Semaphore[IO]] = Semaphore[IO](1)
+
+  (inIO, outIO, semph)                 // Stage 1: Getting resources 
+    .tupled                            // From (IO[InputStream], IO[OutputStream], IO[Semaphore]) to IO[(InputStream, OutputStream, Semaphore)]
+    .bracket{
+      case (in, out, semph) =>         // Stage 2: Using resources (for copying data, in this case)
+        for {
+          _      <- semph.acquire
+          amount <- transfer(in, out)
+          _      <- semph.release
+        } yield amount
+    } {
+      case (in, out, semph) =>         // Stage 3: Freeing resources
+        for {
+          _ <- semph.acquire
+          _ <- (close(in), close(out))
+                 .tupled               // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
+          _ <- semph.release
+        } yield ()
+    }
+}
+```
+
+By using a semaphore we can be sure that even if the `IO` instance is cancelled
+while being evaluated the actual transferring of data will not happen while the
+streams are closed.
+
+Is that it?... well, no. In fact this code will not behave as intended. Look
+again to this loop:
+
+```scala
+for {
+  _      <- semph.acquire
+  amount <- transfer(in, out)
+  _      <- semph.release
+} yield amount
+```
+
+If the `IO` is cancelled while `transfer` is being executed then the
+`semph.release` will never get executed! So, instead, the semaphore must be
+adquired and released _inside_ the `transfer` function. This complicates things
+a bit:
+
+////////////////////////////////
+
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+CONTINUE HERE
+
+
+
 And that is it! We are done, now we can create a program that tests this
 function. We will use `IOApp` for that, as it allows to maintain purity in our
 definitions up to the main function. You can check the final result
 [here](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/CopyFile.scala).
 
-```scala
-package tutorial
-
-import cats.effect.{ExitCode, IO, IOApp}
-import cats.implicits._ 
-import java.io._ 
-
-object CopyFile extends IOApp {
-
-  def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
-    for {
-      _      <- IO.cancelBoundary // Cancelable at each iteration
-      amount <- IO{ origin.read(buffer, 0, buffer.size) }
-      total  <- if(amount > -1) IO { destination.write(buffer, 0, amount) } *> transmit(origin, destination, buffer, acc + amount)
-                else IO.pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
-    } yield total // Returns the actual amount of bytes transmitted
-
-  def transfer(origin: InputStream, destination: OutputStream): IO[Long] =
-    for {
-      buffer <- IO{ new Array[Byte](1024 * 10) } // Allocated only when the IO is evaluated
-      acc    <- transmit(origin, destination, buffer, 0L)
-    } yield acc
-
-  def copy(origin: File, destination: File): IO[Long] = {
-    val inIO: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
-    val outIO:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
-
-    (inIO, outIO)              // Stage 1: Getting resources 
-      .tupled                  // From (IO[InputStream], IO[OutputStream]) to IO[(InputStream, OutputStream)]
-      .bracket{
-        case (in, out) =>
-          transfer(in, out)    // Stage 2: Using resources (for copying data, in this case)
-      } {
-        case (in, out) =>      // Stage 3: Freeing resources
-          (IO{in.close()}, IO{out.close()})
-          .tupled              // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
-          .handleErrorWith(_ => IO.unit) *> IO.unit
-      }
-  }
-
-  // The 'main' function of IOApp //
-  override def run(args: List[String]): IO[ExitCode] =
-    for {
-      _      <- if(args.length < 2) IO.raiseError(new IllegalArgumentException("Need origin and destination files"))
-                else IO.unit
-      orig   <- IO.pure(new File(args(0)))
-      dest   <- IO.pure(new File(args(1)))
-      copied <- copy(orig, dest)
-      _      <- IO{ println(s"$copied bytes copied from ${orig.getPath} to ${dest.getPath}") }
-    } yield ExitCode.Success
-
-}
-```
-
 `IOApp` is a kind of 'functional' equivalent to Scala's `App`, where instead of
 coding an effectful `main` method we code a pure `run` function. When executing
 the class a `main` method defined in `IOApp` will call the `run` function we
-have coded.
+have coded. Any interruption will be treated as a cancellation of the running
+`IO`.
 
-Also, heed how `run` verifies the `args` list passed. If there are less than two
-arguments, an error is raised. As `IO` implements `MonadError` we can at any
-moment call to `IO.raiseError` to interrupt a sequence of `IO` operations.
+Also, heed in the example linked above how `run` verifies the `args` list
+passed. If there are less than two arguments, an error is raised. As `IO`
+implements `MonadError` we can at any moment call to `IO.raiseError` to
+interrupt a sequence of `IO` operations.
 
 You can run this code from `sbt` just by issuing this call:
 
@@ -263,8 +310,14 @@ You can run this code from `sbt` just by issuing this call:
 > runMain catsEffectTutorial.CopyFile
 ```
 
-First exercises
----------------
+It can be argued than using `IO{java.nio.file.Files.copy(...)}` would get an
+`IO` with the same characteristics of purity than our function. But there is a
+difference: our `IO` is safely cancellable! So we can cancel the `IO` at any
+time. This will not make much of a difference for a small files maybe, but
+really big files can take a long time to copy and probably we will not want to
+wait until the full copy has been performed.
+
+### Exercises: improving our small `IO` program
 To finalize we propose you some exercises that will help you to keep improving
 your IO-kungfu:
 
@@ -309,7 +362,7 @@ will use `cats-effect`'s `Fiber`, which can be seen as light threads. For each
 new client a `Fiber` instance will be spawned to serve that client.
 
 A design guide we will stick to: whoever method creates a resource is the sole
-responsible of dispatching it.
+responsible of dispatching it!
 
 Let's build our server step-by-step. First we will code a method that implements
 the echo protocol. It will take as input the socket (`java.net.Socket` instance)
@@ -375,7 +428,7 @@ import cats.effect.Exitcase._
     case (reader, writer) => loop(reader, writer)
   } {
     case ((reader, writer), Completed)  => IO{ println("Finished service to client normally") } *> close(reader, writer)
-    case ((reader, writer), Cancelled)   => IO{ println("Finished service to client because cancellation") } *> close(reader, writer)
+    case ((reader, writer), Cancelled)  => IO{ println("Finished service to client because cancellation") } *> close(reader, writer)
     case ((reader, writer), Error(err)) => IO{ println(s"Finished service to client due to error: '${err.getMessage}'") } *> close(reader, writer)
   }
 ```
@@ -448,8 +501,8 @@ _NOTE: If you have coded servers before, probably you are wondering if
 cats-effect provides some magical way to attend an unlimited number of clients
 without balancing the load somehow. Truth is, it doesn't. You can spawn as many
 fibers as you wish, but there is no guarantee they will run simultaneously. More
-about this in the last section [Warning: fibers are not
-threads!](#fibersarenotthreads)_
+about this in the section [Warning: fibers are not
+threads!](#warning-fibers-are-not-threads)_
 
 So, what do we miss now? Only the creation of the server socket of course,
 which we can already do in the `run` method of an `IOApp`. So our final server
@@ -487,7 +540,7 @@ get a bit more complicated. We will deal with proper server halting in the next
 section.
 
 
-Handling exit events (graceful server stop)
+Graceful server stop (handling exit events)
 -------------------------------------------
 There is no way to shutdown gracefully the echo server coded in the previous
 version. Sure we can always `<Ctrl>-c` it, but proper servers should provide
@@ -606,8 +659,7 @@ like they were daemon threads. Arguably, we could expect that shutting down the
 server shall close _all_ connections. How could we do it? Solving that issue is
 the proposed final exercise below.
 
-Closing client connections to echo server on shutdown (exercise)
-----------------------------------------------------------------
+### Exercise: closing client connections to echo server on shutdown
 We need to close all connections with clients when the server is shut down. To
 do that we can call `cancel` on each one of the `Fiber` instances we have
 created to attend each new client. But how? After all, we are not tracking
@@ -616,7 +668,7 @@ you devise a mechanism so all client connections are closed when the server is
 shutdown? We propose a solution in the next subsection, but maybe you can
 consider taking some time looking for a solution :) .
 
-## Solution
+### Solution
 We could keep a list of active fibers serving client connections. It is
 doable, but cumbersome...  and not really needed at this point.
 
@@ -712,7 +764,7 @@ And what about trying to develop different protocols!? We let to your
 imagination how to expand this quite simple server with cats-effect lib. But
 first take a look to the next sections, it may give you more ideas ;)
 
-Warning: fibers are not threads!<a name="fibersarenotthreads"></a>
+Warning: fibers are not threads!<a name="warning-fibers-are-not-threads"></a>
 --------------------------------
 As stated before, fibers are like 'light' threads, meaning they can be used in a
 similar way than threads to create concurrent code. However, they are _not_
@@ -770,8 +822,7 @@ for {
 intermediate) users of cats-effect. So do not worry if it takes some time for
 you to master.
 
-Using a custom thread pool in Echo server (exercise)
-----------------------------------------------------
+### Exercise: using a custom thread pool in Echo server
 Given what we know so far, how could we solve the problem of the limited number
 of clients attended in parallel in our Echo server? Recall that in traditional
 servers we would make use of an specific thread pool for clients, able to resize
@@ -779,7 +830,7 @@ in case more threads are needed. You can get such a pool using
 `Executors.newCachedThreadPool()` as in the example of the previous section. But
 take care of shutting it down when the server is stopped!
 
-## Solution
+### Solution
 Well, the solution is quite straighforward. We only need to create a thread pool
 and execution context, and use it whenever we need to read input from some
 connected client. So the beginning of the `loop` function would look like:

@@ -16,39 +16,51 @@
 package catsEffectTutorial
 
 import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.concurrent.Semaphore
 import cats.implicits._ 
 import java.io._ 
 
 object CopyFile extends IOApp {
 
-  def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
+  def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long, semph: Semaphore[IO]): IO[Long] =
     for {
       _      <- IO.cancelBoundary // Cancelable at each iteration
-      amount <- IO{ origin.read(buffer, 0, buffer.size) }
-      total  <- if(amount > -1) IO { destination.write(buffer, 0, amount) } *> transmit(origin, destination, buffer, acc + amount)
-                else IO.pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
+      _      <- semph.acquire
+      amount <- IO{ origin.read(buffer, 0, buffer.size) }.handleErrorWith(err => semph.release *> IO.raiseError(err))
+      total  <- if(amount > -1) IO { destination.write(buffer, 0, amount) }.handleErrorWith(err => semph.release *> IO.raiseError(err)) *> semph.release *> transmit(origin, destination, buffer, acc + amount, semph)
+                else semph.release *> IO.pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
     } yield total // Returns the actual amount of bytes transmitted
 
-  def transfer(origin: InputStream, destination: OutputStream): IO[Long] =
+  def transfer(origin: InputStream, destination: OutputStream, semph: Semaphore[IO]): IO[Long] =
     for {
       buffer <- IO{ new Array[Byte](1024 * 10) } // Allocated only when the IO is evaluated
-      acc    <- transmit(origin, destination, buffer, 0L)
+      acc    <- transmit(origin, destination, buffer, 0L, semph)
     } yield acc
 
-  def copy(origin: File, destination: File): IO[Long] = {
-    val inIO: IO[InputStream]  = IO{ new BufferedInputStream(new FileInputStream(origin)) }
-    val outIO:IO[OutputStream] = IO{ new BufferedOutputStream(new FileOutputStream(destination)) }
+  def close(is: InputStream): IO[Unit] =
+    IO{is.close()}.handleErrorWith(_ => IO.unit)
 
-    (inIO, outIO)              // Stage 1: Getting resources 
-      .tupled                  // From (IO[InputStream], IO[OutputStream]) to IO[(InputStream, OutputStream)]
+  def close(os: OutputStream): IO[Unit] =
+    IO{os.close()}.handleErrorWith(_ => IO.unit)
+
+  def copy(origin: File, destination: File): IO[Long] = {
+    val inIO: IO[InputStream]   = IO{ new FileInputStream(origin) }
+    val outIO:IO[OutputStream]  = IO{ new FileOutputStream(destination) }
+    val semph:IO[Semaphore[IO]] = Semaphore[IO](1)
+
+    (inIO, outIO, semph)                 // Stage 1: Getting resources 
+      .tupled                            // From (IO[InputStream], IO[OutputStream], IO[Semaphore]) to IO[(InputStream, OutputStream, Semaphore)]
       .bracket{
-        case (in, out) =>
-          transfer(in, out)    // Stage 2: Using resources (for copying data, in this case)
+        case (in, out, semph) =>         // Stage 2: Using resources (for copying data, in this case)
+          transfer(in, out, semph)
       } {
-        case (in, out) =>      // Stage 3: Freeing resources
-          (IO{in.close()}, IO{out.close()})
-          .tupled              // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
-          .handleErrorWith(_ => IO.unit) *> IO.unit
+        case (in, out, semph) =>         // Stage 3: Freeing resources
+          for {
+            _ <- semph.acquire
+            _ <- (close(in), close(out))
+                   .tupled               // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
+            _ <- semph.release
+          } yield ()
       }
   }
 

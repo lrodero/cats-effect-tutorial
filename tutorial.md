@@ -72,9 +72,11 @@ Nothing scary, uh? As we said before, the function just returns an `IO`
 instance. When run, all side-effects will be actually executed and the `IO`
 instance will return the bytes copies in a `Long` (`IO` is parameterized by the
 return type). Now, let's go step-by-step to implement our function. First thing
-to do, we need to open two streams that will read and write file contents. We
-consider opening an stream to be a side-effect action, so we have to encapsulate
-those actions in their own `IO` instances.
+to do, we need to open two streams that will read and write file contents. 
+
+### Acquiring and releasing resources
+We consider opening an stream to be a side-effect action, so we have to
+encapsulate those actions in their own `IO` instances.
 
 ```scala
 import cats.effect.IO
@@ -90,7 +92,7 @@ def copy(origin: File, destination: File): IO[Long] = {
 ```
 
 We want to ensure that once we are done copying both streams are close. For that
-we will use `bracket`. There are three stages when using `bracket`: _resource
+we could use `bracket`. There are three stages when using `bracket`: _resource
 adquisition_, _usage_, and _release_. Each stage is defined by an `IO` instance.
 A fundamental property is that the _release_ stage will always be run regardless
 whether the _usage_ stage finished correctly or an exception was thrown during
@@ -124,25 +126,69 @@ def copy(origin: File, destination: File): IO[Long] = {
 }
 ```
 
-So far so good, we have our streams ready to go! And in a safe manner too, as
-the `bracket` construct ensures they are closed no matter what. Note that any
-possible error raised when closing is 'swallowed' by the `handleErrorWith`
-call, which in the code above basically ignores the error cause. Not elegant,
-but enough for this example. Anyway in the real world there would be little else
-to do save maybe showing a warning message. Finally we chain the closing action
-using `*>` call to return an `IO.unit` after closing (note that `*>` is cats
-sugar syntax, it's like using `flatMap` but the second step does not need as
-input the output from the first).
+So far so good? Can we now move to implement that `transfer` function (that will
+do the actual work). Well, not really. There is a catch when using the code
+above.  When using `bracket` if there is a problem when getting resources, in
+the first stage, then the release stage will not be run. Now, in the code above
+first the origin file and then the destination file are opened (`tupled` just
+reorganizes both `IO` instances in a single one). So what would happen if we
+successfully open the origin file but then an exception is raised when opening
+the destination file? In that case the origin file will not be closed!
 
-For the sake of clarity, the actual construction of the `IO` performing the
-actual data copying (the _usage_ stage in this case) will be done by a different
-function `transfer`. That function will have to define a loop that at each
-iteration reads data from the input stream into a buffer, and then writes the
-buffer contents into the output. At the same time, the loop will keep a counter
-of the bytes transferred. To reuse the same buffer we should define it outside
-the main loop, and leave the actual transmission of data to another function
-`transmit` that uses that loop. Something like:
+Ok, so `bracket` is good but not perfect for all cases. What shall we do now? We
+will use an alternative mechanism: `Resource`. With `Resource` we can easily
+handle resources (such as files) one by one in an ordered manner. See this
+code:
 
+```scala
+def inputStream(f: File): Resource[IO, FileInputStream] =
+  Resource.make {
+    IO(new FileInputStream(f))
+  } { inStream =>
+    IO(inStream.close())
+  }
+
+def outputStream(f: File, guard: Semaphore[IO]): Resource[IO, FileOutputStream] =
+  Resource.make {
+    IO(new FileOutputStream(f))
+  } { outStream =>
+    IO(outStream.close())
+  }
+
+def inputOutputStreams(in: File, out: File): Resource[IO, (InputStream, OutputStream)] =
+  for {
+    inStream  <- inputStream(in)
+    outStream <- outputStream(out)
+  } yield (inStream, outStream)
+
+def copy(origin: File, destination: File): IO[Long] = 
+  for {
+    transferred <- inputOutputStreams(origin, destination).use { case (in, out) => 
+                     transfer(in, out)
+                   }
+  } yield transferred
+```
+
+The ``inputOutputStreams` encapsulates both resources in a single `Resource`
+instance. Even better, because of `Resource` semantics if there is any problem
+opening the input file then the output file will not be opened. On the other
+hand, if there is any issue opening the output file, then the input stream will
+be closed. Finally, if both files could opened then the resource can be used,
+and whatever happens during that usage the streams will be closed. Thing is, at
+the end of the day `Resource` is in fact using `bracket` underneath, once per
+resource. So our `inputOutputStreams` function is in fact a `bracket` (for the
+input file stream) that wraps another `bracket` (for the output file stream). We
+could have done something similar ourselves, but `Resource` allows for cleaner
+code.
+
+Now we do have our streams ready to go! For the sake of clarity, the actual
+construction of the `IO` performing the actual data copying will be done by a
+different function `transfer`. That function will have to define a loop that at
+each iteration reads data from the input stream into a buffer, and then writes
+the buffer contents into the output. At the same time, the loop will keep a
+counter of the bytes transferred. To reuse the same buffer we should define it
+outside the main loop, and leave the actual transmission of data to another
+function `transmit` that uses that loop. Something like:
 
 ```scala
 import cats.effect.IO
@@ -162,6 +208,13 @@ def transfer(origin: InputStream, destination: OutputStream): IO[Long] =
     buffer <- IO{ new Array[Byte](1024 * 10) } // Allocated only when the IO is evaluated
     acc    <- transmit(origin, destination, buffer, 0L)
   } yield acc
+
+
+def copy(origin: File, destination: File): IO[Long] = 
+  inputOutputStreams(origin, destination).use { case (in, out) =>
+    transfer(in, out)
+  }
+  
 ```
 
 Take a look to `transmit`, observe that both input and output actions are
@@ -176,16 +229,26 @@ actual transference of data we aim for. But it is a good policy, as it marks
 where the `IO` evaluation will be stopped (cancelled) if requested. In this case,
 at the beginning of each iteration.
 
-Still, there is a catch in our code: stage 2 and stage 3 can happen
-simultaneously! This is due to cats-effect cancellation mechanism. Now,
+We are making progress, and already have a version of `copy` that can be used.
+If any exception is raised when `transfer` is running, then the streams will be
+automatically closed by `Resource`. But there is something else we have to take
+into account: `IO` instances execution can be cancelled! We will deal with
+cancellation in the next section.
+
+### Dealing with cancellation
+Recall that `Resource` is in fact making
+use of `bracket`. And in `bracket`, stage 2 and stage 3 (usage and release) can
+happen simultaneously! This is due to cats-effect cancellation mechanism. Now,
 cancellation is a cats-effect feature, powerful but non trivial. In cats-effect,
 some `IO` instances can be cancellable, meaning than their evaluation will be
-aborted and, possibly, an alternative `IO` task will be run for example to deal
-with potential cleaning up activities. We will se how an `IO` can be
-actually cancelled at the end of the [Warning: fibers are not threads!
-section](#warning-fibers-are-not-threads), but for now we will just keep 
+aborted and, if the programmer is careful, an alternative `IO` task will be run
+for example to deal with potential cleaning up activities. We will se how an
+`IO` can be actually cancelled at the end of the [Warning: fibers are not
+threads!  section](#warning-fibers-are-not-threads), but for now we will just
+keep in mind that during the execution of the `transfer` method a cancellation
+can occur. 
 
-If an `IO` created with `bracket` is cancelled, in fact it will be the `IO` in
+When an `IO` created with `bracket` (and so the same applies to `Resource.use`) is cancelled, in fact it will be the `IO` in
 stage 2 which will be cancelled, while its release stage will be called to deal
 with the cancellation. If at the same time the `IO` is being evaluated then both
 usae and release will happen simultaneously. In certain cases that can lead to

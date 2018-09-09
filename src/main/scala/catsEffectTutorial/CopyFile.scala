@@ -24,17 +24,16 @@ object CopyFile extends IOApp {
 
   def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
     for {
-      _      <- IO.cancelBoundary // Cancelable at each iteration
       amount <- IO(origin.read(buffer, 0, buffer.size))
-      total  <- if(amount > -1) IO(destination.write(buffer, 0, amount)) *> transmit(origin, destination, buffer, acc + amount)
+      count  <- if(amount > -1) IO(destination.write(buffer, 0, amount)) *> transmit(origin, destination, buffer, acc + amount)
                 else IO.pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
-    } yield total // Returns the actual amount of bytes transmitted
+    } yield count // Returns the actual amount of bytes transmitted
 
   def transfer(origin: InputStream, destination: OutputStream): IO[Long] =
     for {
       buffer <- IO{ new Array[Byte](1024 * 10) } // Allocated only when the IO is evaluated
-      acc    <- transmit(origin, destination, buffer, 0L)
-    } yield acc
+      total  <- transmit(origin, destination, buffer, 0L)
+    } yield total
 
   def inputStream(f: File, guard: Semaphore[IO]): Resource[IO, FileInputStream] =
     Resource.make {
@@ -66,11 +65,11 @@ object CopyFile extends IOApp {
 
   def copy(origin: File, destination: File): IO[Long] = 
     for {
-      guard       <- Semaphore[IO](1)
-      transferred <- inputOutputStreams(origin, destination, guard).use { case (in, out) => 
-                       transfer(in, out).guarantee(guard.release)
-                     }
-    } yield transferred
+      guard <- Semaphore[IO](1)
+      count <- inputOutputStreams(origin, destination, guard).use { case (in, out) => 
+                 guard.acquire *> transfer(in, out).guarantee(guard.release)
+               }
+    } yield count
 
   // The 'main' function of IOApp //
   override def run(args: List[String]): IO[ExitCode] =
@@ -79,8 +78,8 @@ object CopyFile extends IOApp {
                 else IO.unit
       orig = new File(args(0))
       dest = new File(args(1))
-      copied <- copy(orig, dest)
-      _      <- IO{ println(s"$copied bytes copied from ${orig.getPath} to ${dest.getPath}") }
+      count <- copy(orig, dest)
+      _     <- IO(println(s"$count bytes copied from ${orig.getPath} to ${dest.getPath}"))
     } yield ExitCode.Success
 
 }

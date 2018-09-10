@@ -41,7 +41,7 @@ object CopyFile extends IOApp {
     } { inStream => 
       for  {
        _ <- guard.acquire
-       _ <- IO(inStream.close())
+       _ <- IO(inStream.close()).handleErrorWith(_ => IO.unit)
        _ <- guard.release
       } yield ()
     }
@@ -52,7 +52,7 @@ object CopyFile extends IOApp {
     } { outStream =>
       for  {
        _ <- guard.acquire
-       _ <- IO(outStream.close())
+       _ <- IO(outStream.close()).handleErrorWith(_ => IO.unit)
        _ <- guard.release
       } yield ()
     }

@@ -3,7 +3,7 @@
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * You may obtain a copy of the License at.
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -29,31 +29,38 @@ object EchoServerV1_Simple extends IOApp {
 
   def echoProtocol(clientSocket: Socket): IO[Unit] = {
   
-    def close(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
-      (IO{reader.close()}, IO{writer.close()})
-        .tupled                        // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
-        .map(_ => ())                  // From IO[(Unit, Unit)] IO[Unit]
-        .handleErrorWith(_ => IO.unit) // Swallowing up any possible error
-  
     def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = for {
-      _    <- IO.cancelBoundary
       line <- IO{ reader.readLine() }
       _    <- line match {
                 case "" => IO.unit // Empty line, we are done
                 case _  => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
               }
     } yield ()
-  
-    val readerIO = IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) }
-    val writerIO = IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) }
-  
-    (readerIO, writerIO)
-      .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
-      .bracket {
-        case (reader, writer) => loop(reader, writer)  // Let's get to work!
-      } {
-        case (reader, writer) => close(reader, writer) // We are done, closing the streams
+
+    def reader(clientSocket: Socket): Resource[IO, BufferedReader] =
+      Resource.make {
+        IO( new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) )
+      } { reader =>
+        IO(reader.close()).handleErrorWith(_ => IO.unit)
       }
+  
+    def writer(clientSocket: Socket): Resource[IO, BufferedWriter] =
+      Resource.make {
+        IO( new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) )
+      } { writer =>
+        IO(writer.close()).handleErrorWith(_ => IO.unit)
+      }
+
+    def readerWriter(clientSocket: Socket): Resource[IO, (BufferedReader, BufferedWriter)] =
+      for {
+        reader <- reader(clientSocket)
+        writer <- writer(clientSocket)
+      } yield (reader, writer)
+
+    readerWriter(clientSocket).use { case (reader, writer) =>
+      loop(reader, writer) // Let's get to work
+    }
+
   }
 
   def serve(serverSocket: ServerSocket): IO[Unit] = {

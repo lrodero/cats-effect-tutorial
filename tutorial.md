@@ -87,16 +87,16 @@ import java.io._
 
 def inputStream(f: File): Resource[IO, FileInputStream] =
   Resource.make {
-    IO(new FileInputStream(f)) // build
+    IO(new FileInputStream(f))                         // build
   } { inStream =>
-    IO(inStream.close())       // release
+    IO(inStream.close()).handleErrorWith(_ => IO.unit) // release
   }
 
 def outputStream(f: File): Resource[IO, FileOutputStream] =
   Resource.make {
-    IO(new FileOutputStream(f)) // build 
+    IO(new FileOutputStream(f))                         // build 
   } { outStream =>
-    IO(outStream.close())       // release
+    IO(outStream.close()).handleErrorWith(_ => IO.unit) // release
   }
 
 def inputOutputStreams(in: File, out: File): Resource[IO, (InputStream, OutputStream)] =
@@ -107,8 +107,8 @@ def inputOutputStreams(in: File, out: File): Resource[IO, (InputStream, OutputSt
 
 def copy(origin: File, destination: File): IO[Long] = 
   for {
-    count <- inputOutputStreams(origin, destination).use { case (in, out) => 
-               transfer(in, out)
+    count <- inputOutputStreams(origin, destination).use { case (in, out) =>
+               transfer(in, out)  // use
              }
   } yield count
 ```
@@ -118,8 +118,27 @@ what. That is precisely why we use `Resource` in both `inputStream` and
 `outputStream` functions, each one returning one `Resource` that encapsulates
 the actions for opening and then closing each stream.  `inputOutputStreams`
 encapsulates both resources in a single `Resource` instance that will be
-available once the creation has been successful. As seen in the code `Resource`
-instances can be combined in for-comprehensions as they implement `flatMap`.
+available once the creation has been successful. As seen in the code above
+`Resource` instances can be combined in for-comprehensions as they implement
+`flatMap`. Note also that when releasing resources we also take care of any
+possible error during the release itself. In this case we just 'swallow' the
+error, but normally it would be at least logged.
+
+Optionally we could have used `Resource.AutoCloseable` to define our resources,
+that method creates `Resource` instances over objects that implement
+`java.lang.AutoCloseable` interface without having to define how the resource is
+released. So our `inputStream` function would look like this:
+
+```scala
+def inputStream(f: File): Resource[IO, FileInputStream] =
+  Resource.AutoCloseable(IO(new FileInputStream(f)))
+```
+
+That code is way simpler, but with that code we would not have control over what
+would happen if the closing operation throws an exception. Also it can be that
+we want to be aware when closing operations are being run, for example using
+logs. Those can be easily added to the release phase of a 'typical' `Resource`
+definition.
 
 Our `copy` function will now look like this:
 
@@ -143,6 +162,7 @@ there is any problem opening the input file then the output file will not be
 opened.  On the other hand, if there is any issue opening the output file, then
 the input stream will be closed.
 
+### What about `bracket`?
 Now, if you are familiar with cats-effect's `bracket` you can be wondering why
 we are not using it as it looks so similar to `Resource`. There are three stages
 when using `bracket`: _resource adquisition_, _usage_, and _release_. Each stage
@@ -191,6 +211,7 @@ Keep in mind there is a reason why `Resource` and `bracket` look so similar. In
 fact, `Resource` instances are using `bracket` underneath. But as commented
 before `Resource` allows for a more orderly handling of resources.
 
+### Copying data 
 Now we do have our streams ready to go! We have to focus now on coding
 `transfer`. That function will have to define a loop that at each iteration
 reads data from the input stream into a buffer, and then writes the buffer
@@ -241,7 +262,7 @@ cancellation in the next section.
 Cancellation is a cats-effect feature, powerful but non trivial. In cats-effect,
 some `IO` instances can be cancellable, meaning than their evaluation will be
 aborted and, if the programmer is careful, an alternative `IO` task will be run
-for example to deal with potential cleaning up activities. We will se how an
+for example to deal with potential cleaning up activities. We will see how an
 `IO` can be actually cancelled at the end of the [Warning: fibers are not
 threads! section](#warning-fibers-are-not-threads), but for now we will just
 keep in mind that during the execution of the `transfer` method a cancellation
@@ -265,10 +286,11 @@ for this case we will use a
 semaphore has a number of permits, its method `adquire` blocks if no permit is
 available until `release` is called on the same semaphore. We will use a
 semaphore with a single permit, along with a new function `close` that will
-close the stream, defined outside `copy` for the sake of readability.
+close the stream, defined outside `copy` for the sake of readability:
 
 ```scala
-// transfer and transmit methods are not changed
+// (transfer and transmit methods are not changed)
+
 def inputStream(f: File, guard: Semaphore[IO]): Resource[IO, FileInputStream] =
   Resource.make {
     IO(new FileInputStream(f))
@@ -315,8 +337,13 @@ blocked on the same semaphore, we can be sure that streams are closed only after
 functionalities.
 
 And that is it! We are done, now we can create a program that tests this
-function. We will use `IOApp` for that, as it allows to maintain purity in our
-definitions up to the main function. You can check the final result
+function.
+
+### `IOApp` for our final program
+We will create a program that copies files, this program only takes two
+parameters: the name of the origin and destination files. For coding this
+program we will use `IOApp` as it allows to maintain purity in our definitions
+up to the main function. You can check the final result
 [here](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/CopyFile.scala).
 
 `IOApp` is a kind of 'functional' equivalent to Scala's `App`, where instead of
@@ -339,18 +366,26 @@ You can run this code from `sbt` just by issuing this call:
 It can be argued than using `IO{java.nio.file.Files.copy(...)}` would get an
 `IO` with the same characteristics of purity than our function. But there is a
 difference: our `IO` is safely cancellable! So the user can stop the running
-code at any time, as our code deals with safe resource release (streams closing)
-even under such circumstances.
+code at any time for example by pressing `Ctrl-C`, our code will deal with safe
+resource release (streams closing) even under such circumstances. The same will
+apply if the `copy` function is run from other modules that require its
+functionality. If the function is cancelled while being run, still resources
+will be properly released.
 
 ### Exercises: improving our small `IO` program
 To finalize we propose you some exercises that will help you to keep improving
 your IO-kungfu:
 
-1. Modify `transmit` so the buffer size is not hardcoded but passed as
+1. Modify the `IOApp` so it shows an error and abort the execution if the origin
+   and destination files are the same, the origin file cannot be open for
+   reading or the destination file cannot be opened for writing. Also, if the
+   destination file already exists, the program should ask for confirmation
+   before overwriting that file.
+2. Modify `transmit` so the buffer size is not hardcoded but passed as
    parameter.
-2. Use some other concurrency tool of cats-effect instead of `semaphore` to
+3. Use some other concurrency tool of cats-effect instead of `semaphore` to
    ensure mutual exclusion of `transfer` execution and streams closing.
-2. Create a new program able to copy folders. If the origin folder has
+4. Create a new program able to copy folders. If the origin folder has
    subfolders, then their contents must be recursively copied too. Of course the
    copying must be safely cancellable at any moment.
 
@@ -365,8 +400,9 @@ This server will be able to attend several clients at the same time. For that we
 will use `cats-effect`'s `Fiber`, which can be seen as light threads. For each
 new client a `Fiber` instance will be spawned to serve that client.
 
-A design guide we will stick to: whoever method creates a resource is the sole
-responsible of dispatching it!
+We will stick to a simple design principle _whoever method creates a resource is
+the sole responsible of dispatching it!_.  It's worth to remark this from the
+beginning to better understand the code listings shown in this tutorial.
 
 Let's build our server step-by-step. First we will code a method that implements
 the echo protocol. It will take as input the socket (`java.net.Socket` instance)
@@ -395,50 +431,45 @@ import java.net._
 
 def echoProtocol(clientSocket: Socket): IO[Unit] = {
 
-  def close(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
-    (IO{reader.close()}, IO{writer.close()})
-      .tupled                        // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
-      .map(_ => ())                  // From IO[(Unit, Unit)] to IO[Unit]
-      .handleErrorWith(_ => IO.unit) // Swallowing up any possible error
+  def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = for {
+    line <- IO{ reader.readLine() }
+    _    <- line match {
+              case "" => IO.unit // Empty line, we are done
+              case _  => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
+            }
+  } yield ()
 
-  def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = ???
-
-  val readerIO = IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) }
-  val writerIO = IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) }
-
-  (readerIO, writerIO)
-    .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
-    .bracket {
-      case (reader, writer) => loop(reader, writer)  // Let's get to work!
-    } {
-      case (reader, writer) => close(reader, writer) // We are done, closing the streams
+  def reader(clientSocket: Socket): Resource[IO, BufferedReader] =
+    Resource.make {
+      IO( new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) )
+    } { reader =>
+      IO(reader.close()).handleErrorWith(_ => IO.unit)
     }
+
+  def writer(clientSocket: Socket): Resource[IO, BufferedWriter] =
+    Resource.make {
+      IO( new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) )
+    } { writer =>
+      IO(writer.close()).handleErrorWith(_ => IO.unit)
+    }
+
+  def readerWriter(clientSocket: Socket): Resource[IO, (BufferedReader, BufferedWriter)] =
+    for {
+      reader <- reader(clientSocket)
+      writer <- writer(clientSocket)
+    } yield (reader, writer)
+
+  readerWriter(clientSocket).use { case (reader, writer) =>
+    loop(reader, writer) // Let's get to work
+  }
+
 }
 ```
 
-Realize that we are using again `bracket` to ensure that the method closes the
+Realize that we are using again `Resource` to ensure that the method closes the
 two streams it creates.  Also, all actions with potential side-effects are
 encapsulated in `IO` instances. That way we ensure no side-effect is actually
-run until the `IO` returned by this method is evaluated. We could use as well
-`bracketCase` for a finer control of what actually caused the termination:
-
-```scala
-import cats.effect.Exitcase._
-
-(IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) },
- IO{ new BufferedWriter(new PrintWriter(socket.getOutputStream()))) }
-  .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
-  .bracketCase {
-    case (reader, writer) => loop(reader, writer)
-  } {
-    case ((reader, writer), Completed)  => IO{ println("Finished service to client normally") } *> close(reader, writer)
-    case ((reader, writer), Cancelled)  => IO{ println("Finished service to client because cancellation") } *> close(reader, writer)
-    case ((reader, writer), Error(err)) => IO{ println(s"Finished service to client due to error: '${err.getMessage}'") } *> close(reader, writer)
-  }
-```
-
-That is a good policy and you must be aware that possibility exists.  But for
-the sake of clarity we will stick to the simpler `bracket` for this tutorial.
+run until the `IO` returned by this method is evaluated.
 
 Finally, and as we did in the previous example, we ignore possible errors when
 closing the streams, as there is little to do in such cases. But, of course, we
@@ -466,6 +497,17 @@ of our server that will list for new connections and create fibers to attend
 them. Let's work on that, we implement that functionality in another method
 that takes as input the `java.io.ServerSocket` instance that will listen for
 clients:
+
+//////////////////
+CONTINUE
+CONTINUE
+CONTINUE
+CONTINUE
+CONTINUE
+CONTINUE
+CONTINUE
+CONTINUE
+DO WE NEED THAT CANCELBOUNDARY IN 'serve' METHOD?
 
 ```scala
 def serve(serverSocket: ServerSocket): IO[Unit] = {

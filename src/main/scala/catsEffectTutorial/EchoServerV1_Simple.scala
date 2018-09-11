@@ -30,7 +30,7 @@ object EchoServerV1_Simple extends IOApp {
   def echoProtocol(clientSocket: Socket): IO[Unit] = {
   
     def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = for {
-      line <- IO{ reader.readLine() }
+      line <- IO(reader.readLine())
       _    <- line match {
                 case "" => IO.unit // Empty line, we are done
                 case _  => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
@@ -65,11 +65,10 @@ object EchoServerV1_Simple extends IOApp {
 
   def serve(serverSocket: ServerSocket): IO[Unit] = {
     def close(socket: Socket): IO[Unit] = 
-      IO{ socket.close() }.handleErrorWith(_ => IO.unit)
+      IO(socket.close()).handleErrorWith(_ => IO.unit)
   
     for {
-      _      <- IO.cancelBoundary
-      socket <- IO{ serverSocket.accept() }
+      socket <- IO(serverSocket.accept())
       _      <- echoProtocol(socket)
                   .guarantee(close(socket)) // We close the socket whatever happens
                   .start                    // Client attended by its own Fiber!
@@ -80,13 +79,13 @@ object EchoServerV1_Simple extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
   
     def close(socket: ServerSocket): IO[Unit] =
-      IO{ socket.close() }.handleErrorWith(_ => IO.unit)
+      IO(socket.close()).handleErrorWith(_ => IO.unit)
   
-    IO{ new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) }
+    IO( new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) )
       .bracket{
         serverSocket => serve(serverSocket) *> IO.pure(ExitCode.Success)
       } {
-        serverSocket => close(serverSocket) *> IO{ println("Server finished") }
+        serverSocket => close(serverSocket) *> IO(println("Server finished"))
       }
   }
 }

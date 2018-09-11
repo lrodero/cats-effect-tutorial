@@ -32,17 +32,11 @@ object EchoServerV4_ClientThreadPool extends IOApp {
 
   def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit])(implicit clientsExecutionContext: ExecutionContext): IO[Unit] = {
   
-    def close(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = 
-      (IO{reader.close()}, IO{writer.close()})
-        .tupled                        // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
-        .map(_ => ())                  // From IO[(Unit, Unit)] to IO[Unit]
-        .handleErrorWith(_ => IO.unit) // Swallowing up any possible error
-  
     def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
       for {
         _     <- IO.cancelBoundary
         _     <- IO.shift(clientsExecutionContext)
-        lineE <- IO{ reader.readLine() }.attempt
+        lineE <- IO(reader.readLine()).attempt
         _     <- IO.shift(ExecutionContext.global)
         _     <- lineE match {
                    case Right(line) => line match {
@@ -59,27 +53,40 @@ object EchoServerV4_ClientThreadPool extends IOApp {
                  }
       } yield ()
   
-    val readerIO = IO{ new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) }
-    val writerIO = IO{ new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) }
-  
-    import cats.effect.ExitCase.{Completed, Error, Canceled}
-    (readerIO, writerIO)
-      .tupled       // From (IO[BufferedReader], IO[BufferedWriter]) to IO[(BufferedReader, BufferedWriter)]
-      .bracket {
-        case (reader, writer) => loop(reader, writer)  // Let's get to work!
-      } {
-        case (reader, writer) => close(reader, writer) // We are done, closing the streams
+    def reader(clientSocket: Socket): Resource[IO, BufferedReader] =
+      Resource.make {
+        IO( new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) )
+      } { reader =>
+        IO(reader.close()).handleErrorWith(_ => IO.unit)
       }
+  
+    def writer(clientSocket: Socket): Resource[IO, BufferedWriter] =
+      Resource.make {
+        IO( new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) )
+      } { writer =>
+        IO(writer.close()).handleErrorWith(_ => IO.unit)
+      }
+
+    def readerWriter(clientSocket: Socket): Resource[IO, (BufferedReader, BufferedWriter)] =
+      for {
+        reader <- reader(clientSocket)
+        writer <- writer(clientSocket)
+      } yield (reader, writer)
+
+    readerWriter(clientSocket).use { case (reader, writer) =>
+      loop(reader, writer) // Let's get to work
+    }
+
   }
 
   def serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit])(implicit clientsExecutionContext: ExecutionContext): IO[Unit] = {
 
     def close(socket: Socket): IO[Unit] = 
-      IO{ socket.close() }.handleErrorWith(_ => IO.unit)
+      IO(socket.close()).handleErrorWith(_ => IO.unit)
 
     for {
       _       <- IO.cancelBoundary
-      socketE <- IO{ serverSocket.accept() }.attempt
+      socketE <- IO(serverSocket.accept()).attempt
       _       <- socketE match {
         case Right(socket) =>
           for { // accept() succeeded, we attend the client in its own Fiber
@@ -108,8 +115,8 @@ object EchoServerV4_ClientThreadPool extends IOApp {
     for {
       stopFlag     <- MVar[IO].empty[Unit]
       serverFiber  <- serve(serverSocket, stopFlag).start
-      _            <- stopFlag.read *> IO{println(s"Stopping server")}
-      _            <- IO{clientsThreadPool.shutdown()}
+      _            <- stopFlag.read *> IO(println(s"Stopping server"))
+      _            <- IO(clientsThreadPool.shutdown())
       _            <- serverFiber.cancel
     } yield ExitCode.Success
 
@@ -118,13 +125,13 @@ object EchoServerV4_ClientThreadPool extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
 
     def close(socket: ServerSocket): IO[Unit] =
-      IO{ socket.close() }.handleErrorWith(_ => IO.unit)
+      IO(socket.close()).handleErrorWith(_ => IO.unit)
 
-    IO{ new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) }
+    IO( new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) )
       .bracket {
         serverSocket => server(serverSocket)
       } {
-        serverSocket => close(serverSocket)  *> IO{println("Server finished") }
+        serverSocket => close(serverSocket)  *> IO(println("Server finished"))
       }
   }
 }

@@ -181,8 +181,8 @@ import java.io._
 def transfer(origin: InputStream, destination: OutputStream): IO[Long] = ???
 
 def copy(origin: File, destination: File): IO[Long] = {
-  val inIO: IO[InputStream]  = IO{ new FileInputStream(origin) }
-  val outIO:IO[OutputStream] = IO{ new FileOutputStream(destination) }
+  val inIO: IO[InputStream]  = IO(new FileInputStream(origin))
+  val outIO:IO[OutputStream] = IO(new FileOutputStream(destination))
 
   (inIO, outIO) 
     .tupled                  // From (IO[InputStream], IO[OutputStream]) to IO[(InputStream, OutputStream)]
@@ -191,7 +191,7 @@ def copy(origin: File, destination: File): IO[Long] = {
         transfer(in, out)    // Stage 2: Using resources (for copying data, in this case)
     } {
       case (in, out) =>      // Stage 3: Freeing resources
-        (IO{in.close()}, IO{out.close()})
+        (IO(in.close()), IO(out.close()()
         .tupled              // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
         .handleErrorWith(_ => IO.unit) *> IO.unit
     }
@@ -227,14 +227,14 @@ import java.io._
 
 def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
   for {
-    amount <- IO{ origin.read(buffer, 0, buffer.size) }
-    count  <- if(amount > -1) IO { destination.write(buffer, 0, amount) } *> transmit(origin, destination, buffer, acc + amount)
+    amount <- IO(origin.read(buffer, 0, buffer.size))
+    count  <- if(amount > -1) IO(destination.write(buffer, 0, amount)) *> transmit(origin, destination, buffer, acc + amount)
               else IO.pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
   } yield count // Returns the actual amount of bytes transmitted
 
 def transfer(origin: InputStream, destination: OutputStream): IO[Long] =
   for {
-    buffer <- IO{ new Array[Byte](1024 * 10) } // Allocated only when the IO is evaluated
+    buffer <- IO(new Array[Byte](1024 * 10)) // Allocated only when the IO is evaluated
     total  <- transmit(origin, destination, buffer, 0L)
   } yield total
 ```
@@ -432,7 +432,7 @@ import java.net._
 def echoProtocol(clientSocket: Socket): IO[Unit] = {
 
   def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = for {
-    line <- IO{ reader.readLine() }
+    line <- IO(reader.readLine())
     _    <- line match {
               case "" => IO.unit // Empty line, we are done
               case _  => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
@@ -480,7 +480,7 @@ client. It is not hard to code though:
 def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
   for {
     _    <- IO.cancelBoundary
-    line <- IO{ reader.readLine() }
+    line <- IO(reader.readLine())
     _    <- line match {
               case "" => IO.unit // Empty line, we are done
               case _  => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
@@ -512,11 +512,11 @@ DO WE NEED THAT CANCELBOUNDARY IN 'serve' METHOD?
 ```scala
 def serve(serverSocket: ServerSocket): IO[Unit] = {
   def close(socket: Socket): IO[Unit] = 
-    IO{ socket.close() }.handleErrorWith(_ => IO.unit)
+    IO(socket.close()).handleErrorWith(_ => IO.unit)
 
   for {
     _      <- IO.cancelBoundary
-    socket <- IO{ serverSocket.accept() }
+    socket <- IO(serverSocket.accept())
     _      <- echoProtocol(socket)
                 .guarantee(close(socket)) // We close the socket whatever happens
                 .start                    // Client attended by its own Fiber!
@@ -631,13 +631,13 @@ We also modify the main `run` method in `IOApp` so now it calls to `server`:
 override def run(args: List[String]): IO[ExitCode] = {
 
   def close(socket: ServerSocket): IO[Unit] =
-    IO{ socket.close() }.handleErrorWith(_ => IO.unit)
+    IO(socket.close()).handleErrorWith(_ => IO.unit)
 
   IO{ new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) }
     .bracket{
       serverSocket => server(serverSocket) *> IO.pure(ExitCode.Success)
     } {
-      serverSocket => close(serverSocket)  *> IO{ println("Server finished") }
+      serverSocket => close(serverSocket)  *> IO(println("Server finished"))
     }
 }
 ```
@@ -658,11 +658,11 @@ This is how we implement `serve` now:
 def serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
 
   def close(socket: Socket): IO[Unit] = 
-    IO{ socket.close() }.handleErrorWith(_ => IO.unit)
+    IO(socket.close()).handleErrorWith(_ => IO.unit)
 
   for {
     _       <- IO.cancelBoundary
-    socketE <- IO{ serverSocket.accept() }.attempt
+    socketE <- IO(serverSocket.accept()).attempt
     _       <- socketE match {
       case Right(socket) =>
         for { // accept() succeeded, we attend the client in its own Fiber
@@ -731,11 +731,11 @@ that change:
 def serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
 
   def close(socket: Socket): IO[Unit] = 
-    IO{ socket.close() }.handleErrorWith(_ => IO.unit)
+    IO(socket.close()).handleErrorWith(_ => IO.unit)
 
   for {
     _       <- IO.cancelBoundary
-    socketE <- IO{ serverSocket.accept() }.attempt
+    socketE <- IO(serverSocket.accept()).attempt
     _       <- socketE match {
       case Right(socket) =>
         for { // accept() succeeded, we attend the client in its own Fiber
@@ -774,7 +774,7 @@ assumed and no action is taken; otherwise the error is raised:
 def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
   for {
     _     <- IO.cancelBoundary
-    lineE <- IO{ reader.readLine() }.attempt
+    lineE <- IO(reader.readLine()).attempt
     _     <- lineE match {
                case Right(line) => line match {
                  case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
@@ -885,7 +885,7 @@ connected client. So the beginning of the `loop` function would look like:
 for{
   _     <- IO.cancelBoundary
   _     <- IO.shift(clientsExecutionContext)
-  lineE <- IO{ reader.readLine() }.attempt
+  lineE <- IO(reader.readLine()).attempt
   _     <- IO.shift(ExecutionContext.global)
   //
 ```
@@ -953,7 +953,7 @@ for {
   lineE <- IO.async{ (cb: Either[Throwable, Either[Throwable, String]] => Unit) => 
              clientsExecutionContext.execute(new Runnable {
                override def run(): Unit = {
-                 val result: Either[Throwable, String] = Try{ reader.readLine() }.toEither
+                 val result: Either[Throwable, String] = Try(reader.readLine()).toEither
                  cb(Right(result))
                }
              })

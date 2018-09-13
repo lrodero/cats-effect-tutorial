@@ -35,7 +35,6 @@ object EchoServerV5_Async extends IOApp {
   
     def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
       for {
-        _     <- IO.cancelBoundary
         lineE <- IO.async{ (cb: Either[Throwable, Either[Throwable, String]] => Unit) => 
                    clientsExecutionContext.execute(new Runnable {
                      override def run(): Unit = {
@@ -91,7 +90,6 @@ object EchoServerV5_Async extends IOApp {
       IO(socket.close()).handleErrorWith(_ => IO.unit)
 
     for {
-      _       <- IO.cancelBoundary
       socketE <- IO(serverSocket.accept()).attempt
       _       <- socketE match {
         case Right(socket) =>

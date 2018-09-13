@@ -34,7 +34,6 @@ object EchoServerV4_ClientThreadPool extends IOApp {
   
     def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
       for {
-        _     <- IO.cancelBoundary
         _     <- IO.shift(clientsExecutionContext)
         lineE <- IO(reader.readLine()).attempt
         _     <- IO.shift(ExecutionContext.global)
@@ -85,7 +84,6 @@ object EchoServerV4_ClientThreadPool extends IOApp {
       IO(socket.close()).handleErrorWith(_ => IO.unit)
 
     for {
-      _       <- IO.cancelBoundary
       socketE <- IO(serverSocket.accept()).attempt
       _       <- socketE match {
         case Right(socket) =>

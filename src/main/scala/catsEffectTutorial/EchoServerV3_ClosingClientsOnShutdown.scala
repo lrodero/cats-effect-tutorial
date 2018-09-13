@@ -31,7 +31,6 @@ object EchoServerV3_ClosingClientsOnShutdown extends IOApp {
   
     def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
       for {
-        _     <- IO.cancelBoundary
         lineE <- IO(reader.readLine()).attempt
         _     <- lineE match {
                    case Right(line) => line match {
@@ -80,7 +79,6 @@ object EchoServerV3_ClosingClientsOnShutdown extends IOApp {
       IO(socket.close()).handleErrorWith(_ => IO.unit)
 
     for {
-      _       <- IO.cancelBoundary
       socketE <- IO(serverSocket.accept()).attempt
       _       <- socketE match {
         case Right(socket) =>

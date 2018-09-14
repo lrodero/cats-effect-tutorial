@@ -130,8 +130,11 @@ that method creates `Resource` instances over objects that implement
 released. So our `inputStream` function would look like this:
 
 ```scala
+import cats.effect.{IO, Resource}
+import java.io.{File, FileInputStream}
+
 def inputStream(f: File): Resource[IO, FileInputStream] =
-  Resource.AutoCloseable(IO(new FileInputStream(f)))
+  Resource.fromAutoCloseable(IO(new FileInputStream(f)))
 ```
 
 That code is way simpler, but with that code we would not have control over what
@@ -143,11 +146,15 @@ definition.
 Our `copy` function will now look like this:
 
 ```scala
+import cats.effect.{IO, Resource}
+import java.io._
+
 def transfer(origin: InputStream, destination: OutputStream): IO[Long] = ???
+def inputOutputStreams(in: File, out: File): Resource[IO, (InputStream, OutputStream)] = ???
 
 def copy(origin: File, destination: File): IO[Long] = 
   for {
-    count <- inputOutputStreams(origin, destination, guard).use { case (in, out) => 
+    count <- inputOutputStreams(origin, destination).use { case (in, out) => 
                transfer(in, out)
              }
   } yield count
@@ -191,7 +198,7 @@ def copy(origin: File, destination: File): IO[Long] = {
         transfer(in, out)    // Stage 2: Using resources (for copying data, in this case)
     } {
       case (in, out) =>      // Stage 3: Freeing resources
-        (IO(in.close()), IO(out.close()()
+        (IO(in.close()), IO(out.close()))
         .tupled              // From (IO[Unit], IO[Unit]) to IO[(Unit, Unit)]
         .handleErrorWith(_ => IO.unit) *> IO.unit
     }
@@ -285,7 +292,14 @@ semaphore with a single permit, along with a new function `close` that will
 close the stream, defined outside `copy` for the sake of readability:
 
 ```scala
+import cats.implicits._
+import cats.effect.{IO, Resource}
+import cats.effect.concurrent.Semaphore
+import java.io._
+import scala.concurrent.ExecutionContext.Implicits.global
+
 // (transfer and transmit methods are not changed)
+def transfer(origin: InputStream, destination: OutputStream): IO[Long] = ???
 
 def inputStream(f: File, guard: Semaphore[IO]): Resource[IO, FileInputStream] =
   Resource.make {
@@ -315,13 +329,15 @@ def inputOutputStreams(in: File, out: File, guard: Semaphore[IO]): Resource[IO, 
     outStream <- outputStream(out, guard)
   } yield (inStream, outStream)
 
-def copy(origin: File, destination: File): IO[Long] = 
+def copy(origin: File, destination: File): IO[Long] = {
+  implicit val contextShift = IO.contextShift(global)
   for {
     guard <- Semaphore[IO](1)
     count <- inputOutputStreams(origin, destination, guard).use { case (in, out) => 
                guard.acquire *> transfer(in, out).guarantee(guard.release)
              }
   } yield count
+}
 ```
 
 Before calling to `transfer` we acquire the semaphore, which is not released
@@ -346,7 +362,8 @@ up to the main function. You can check the final result
 coding an effectful `main` method we code a pure `run` function. When executing
 the class a `main` method defined in `IOApp` will call the `run` function we
 have coded. Any interruption (like pressing `Ctrl-c`) will be treated as a
-cancellation of the running `IO`.
+cancellation of the running `IO`. Also `IOApp` provides an implicit execution
+context so it does not be imported/created by the code explicitely.
 
 Also, heed in the example linked above how `run` verifies the `args` list
 passed. If there are less than two arguments, an error is raised. As `IO`
@@ -473,6 +490,10 @@ still miss that `loop` method that will do the actual interactions with the
 client. It is not hard to code though:
 
 ```scala
+import cats.effect.IO
+import cats.implicits._
+import java.io._
+
 def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
   for {
     line <- IO(reader.readLine())
@@ -494,10 +515,18 @@ that takes as input the `java.io.ServerSocket` instance that will listen for
 clients:
 
 ```scala
+import cats.effect.IO
+import java.net.{ServerSocket, Socket}
+import scala.concurrent.ExecutionContext.Implicits.global
+
+// echoProtocol as defined above
+def echoProtocol(clientSocket: Socket): IO[Unit] = ???
+
 def serve(serverSocket: ServerSocket): IO[Unit] = {
   def close(socket: Socket): IO[Unit] = 
     IO(socket.close()).handleErrorWith(_ => IO.unit)
 
+  implicit val contextShift = IO.contextShift(global)
   for {
     socket <- IO(serverSocket.accept())
     _      <- echoProtocol(socket)
@@ -539,7 +568,14 @@ So, what do we miss now? Only the creation of the server socket of course,
 which we can already do in the `run` method of an `IOApp`:
 
 ```scala
-override def run(args: List[String]): IO[ExitCode] = {
+import cats.effect.{ExitCode, IO}
+import cats.implicits._
+import java.net.ServerSocket
+
+/// serve as defined above
+def serve(serverSocket: ServerSocket): IO[Unit] = ???
+
+def run(args: List[String]): IO[ExitCode] = {
 
   def close(socket: ServerSocket): IO[Unit] =
     IO(socket.close()).handleErrorWith(_ => IO.unit)
@@ -617,6 +653,10 @@ Let's first define a new method `server` that instantiates the flag, runs the
 the flag is set the server fiber will be cancelled.
 
 ```scala
+import cats.effect.{ExitCode, IO}
+import cats.effect.concurrent.MVar
+import java.net.ServerSocket
+
 def server(serverSocket: ServerSocket): IO[ExitCode] = 
   for {
       stopFlag    <- MVar[IO].empty[Unit]
@@ -629,7 +669,7 @@ def server(serverSocket: ServerSocket): IO[ExitCode] =
 We also modify the main `run` method in `IOApp` so now it calls to `server`:
 
 ```scala
-override def run(args: List[String]): IO[ExitCode] = {
+def run(args: List[String]): IO[ExitCode] = {
 
   def close(socket: ServerSocket): IO[Unit] =
     IO(socket.close()).handleErrorWith(_ => IO.unit)
@@ -837,6 +877,7 @@ available threads to the pending `IO` actions. So there are our threads!
 Cats-effect provides ways to use different `scala.concurrent.ExecutionContext`s,
 each one with its own thread pool, and to swap which one should be used for each
 new `IO` to ask to reschedule threads among the current active `IO` instances,
+import scala.concurrent.ExecutionContext.Implicits.global
 _e.g._ for improved fairness etc. Such functionality is provided by `IO.shift`.
 Also, it even allows to 'swap' to different `Timer`s (that is, different thread
 pools) when running `IO` actions. See this code, which is mostly a copy example
@@ -844,19 +885,23 @@ available at [IO documentation in cats-effect web, Thread Shifting
 section](https://typelevel.org/cats-effect/datatypes/io.html#thread-shifting):
 
 ```scala
+import cats.effect.IO
 import java.util.concurrent.Executors
-
 import scala.concurrent.ExecutionContext
+
+// In our server code this is provided by IOApp
+import scala.concurrent.ExecutionContext.Implicits.global
 
 val cachedThreadPool = Executors.newCachedThreadPool()
 val clientsExecutionContext = ExecutionContext.fromExecutor(cachedThreadPool)
-implicit val Main = ExecutionContext.global
+// In our server code this is provided by IOApp
+implicit val contextShift = IO.contextShift(global) 
 
 for {
   _ <- IO.shift(clientsExecutionContext) // Swapping to cached thread pool
-  _ <- IO() // Whatever is done here, is done by a thread from the cached thread pool
+  _ <- IO(???) // Whatever is done here, is done by a thread from the cached thread pool
   _ <- IO.shift // Swapping back to default timer
-  _ <- IO(println(s"Welcome $name!")) 
+  _ <- IO(println(s"Welcome!")) 
 } yield ()
 ```
 
@@ -894,6 +939,8 @@ def server(serverSocket: ServerSocket): IO[ExitCode] = {
 
   val clientsThreadPool = Executors.newCachedThreadPool()
   implicit val clientsExecutionContext = ExecutionContext.fromExecutor(clientsThreadPool)
+  // In our server code this is provided by IOApp
+  implicit val contextShift = IO.contextShift(global)
 
   for {
     stopFlag     <- MVar[IO].empty[Unit]
@@ -920,8 +967,8 @@ thread different than the one carrying the evaluation of that instance. Result
 will be returned by using a callback.
 
 Some of you may wonder if that could help us to solve the issue of having
-blocking code in our fabolous echo server. Thing is, `async` cannot magically
-'unblock' such code. Try this simple snippet:
+blocking code in our fabolous echo server. Unfortunately, `async` cannot
+magically 'unblock' such code. Try this simple code snippet:
 
 ```scala
 import cats.effect.IO
@@ -929,7 +976,7 @@ import cats.implicits._
 
 import scala.util.Either
 
-for {
+val delayedIO = for {
   _ <- IO(println("Starting"))
   _ <- IO.async[Unit]{ (cb: Either[Throwable,Unit] => Unit) =>
       Thread.sleep(2000)
@@ -937,6 +984,8 @@ for {
     }
   _ <- IO(println("Done")) // 2 seconds to get here, no matter what
 } yield()
+
+delayedIO.unsafeRunSync()
 ```
 
 You will notice that the code still blocks. So how is `async` useful? Well,
@@ -963,7 +1012,13 @@ context can create new threads if no free ones are available, then we will be
 able to attend as many clients as needed. This is similar to the solution we
 used previously shifting the task to the execution context! And in fact `shift`
 makes something close to what we have just coded: it introduces asynchronous
-boundaries to reorganize how threads are used.
+boundaries to reorganize how threads are used. The final result will be
+identical to our previous server version. To attend client connections, if no
+thread is available in the pool, new threads will be created in the pool. A full
+version of our echo server using this approach is [available in
+github](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV5_Async.scala).
+
+### When is `async` useful then?
 
 The `async` construct is useful specially when the task to run by the `IO` can
 be terminated by any thread. For example, calls to remote services are often
@@ -972,8 +1027,17 @@ our `IO`, should we block on the `Future` waiting for the result? No! We can
 wrap the call in an `async` call like:
 
 ```scala
+import cats.effect.IO
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.util._
+
+trait Service { def getSomething(): Future[String] }
+def service: Service = ???
+
 IO.async[String]{ (cb: Either[Throwable, String] => Unit) => 
-  service.getSomething().onCompleted {
+  service.getSomething().onComplete {
     case Success(s) => cb(Right(s))
     case Failure(e) => cb(Left(e))
   }

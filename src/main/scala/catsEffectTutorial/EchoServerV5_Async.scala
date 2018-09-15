@@ -33,7 +33,7 @@ object EchoServerV5_Async extends IOApp {
 
   def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit])(implicit clientsExecutionContext: ExecutionContext): IO[Unit] = {
   
-    def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
+    def loop(reader: BufferedReader, writer: BufferedWriter, stopFlag: MVar[IO, Unit]): IO[Unit] =
       for {
         lineE <- IO.async{ (cb: Either[Throwable, Either[Throwable, String]] => Unit) => 
                    clientsExecutionContext.execute(new Runnable {
@@ -47,7 +47,7 @@ object EchoServerV5_Async extends IOApp {
                    case Right(line) => line match {
                      case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
                      case ""     => IO.unit          // Empty line, we are done
-                     case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
+                     case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer, stopFlag)
                    }
                    case Left(e) =>
                      for { // readLine() failed, stopFlag will tell us whether this is a graceful shutdown
@@ -79,7 +79,7 @@ object EchoServerV5_Async extends IOApp {
       } yield (reader, writer)
 
     readerWriter(clientSocket).use { case (reader, writer) =>
-      loop(reader, writer) // Let's get to work
+      loop(reader, writer, stopFlag) // Let's get to work
     }
 
   }

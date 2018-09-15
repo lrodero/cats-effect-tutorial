@@ -29,14 +29,14 @@ object EchoServerV3_ClosingClientsOnShutdown extends IOApp {
 
   def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
   
-    def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] =
+    def loop(reader: BufferedReader, writer: BufferedWriter, stopFlag: MVar[IO, Unit]): IO[Unit] =
       for {
         lineE <- IO(reader.readLine()).attempt
         _     <- lineE match {
                    case Right(line) => line match {
                      case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
                      case ""     => IO.unit          // Empty line, we are done
-                     case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
+                     case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer, stopFlag)
                    }
                    case Left(e) =>
                      for { // readLine() failed, stopFlag will tell us whether this is a graceful shutdown
@@ -68,7 +68,7 @@ object EchoServerV3_ClosingClientsOnShutdown extends IOApp {
       } yield (reader, writer)
 
     readerWriter(clientSocket).use { case (reader, writer) =>
-      loop(reader, writer) // Let's get to work
+      loop(reader, writer, stopFlag) // Let's get to work
     }
 
   }

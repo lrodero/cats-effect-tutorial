@@ -1004,8 +1004,8 @@ the execution context as parameter. The resulting server code is [available in
 github](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV4_ClientThreadPool).
 
 
-Let's not forget about async
-----------------------------
+Let's not forget about `async`
+-----------------------------
 
 The `async` functionality is another powerful capability of cats-effect we have
 not mentioned yet. It allows to build `IO` instances that may be terminated by a

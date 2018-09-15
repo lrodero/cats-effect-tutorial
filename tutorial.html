@@ -68,7 +68,7 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <li><a href="#exercise-using-a-custom-thread-pool-in-echo-server">Exercise: using a custom thread pool in echo server</a></li>
 <li><a href="#solution-1">Solution</a></li>
 </ul></li>
-<li><a href="#lets-not-forget-about-async">Let's not forget about async</a><ul>
+<li><a href="#lets-not-forget-about-async">Let's not forget about <code>async</code></a><ul>
 <li><a href="#when-is-async-useful-then">When is <code>async</code> useful then?</a></li>
 </ul></li>
 <li><a href="#conclusion">Conclusion</a></li>
@@ -616,7 +616,7 @@ Connection closed by foreign host.</code></pre>
 
 }</code></pre></div>
 <p>Signatures of <code>serve</code> and of <code>echoProtocol</code> will have to be changed too to pass the execution context as parameter. The resulting server code is <a href="https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV4_ClientThreadPool">available in github</a>.</p>
-<h2 id="lets-not-forget-about-async">Let's not forget about async</h2>
+<h2 id="lets-not-forget-about-async">Let's not forget about <code>async</code></h2>
 <p>The <code>async</code> functionality is another powerful capability of cats-effect we have not mentioned yet. It allows to build <code>IO</code> instances that may be terminated by a thread different than the one carrying the evaluation of that instance. Result will be returned by using a callback.</p>
 <p>Some of you may wonder if that could help us to solve the issue of having blocking code in our fabolous echo server. Unfortunately, <code>async</code> cannot magically 'unblock' such code. Try this simple code snippet:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">import</span> cats.<span class="fu">effect</span>.<span class="fu">IO</span>

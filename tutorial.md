@@ -1,5 +1,9 @@
 Cats-effect tutorial
 ====================
+
+Intro
+-----
+
 [Cats-effect](https://typelevel.org/cats-effect), the effects library for
 [Cats](https://typelevel.org/cats), has a complete documentation explaining the
 types it brings, full with small examples about how to use them. However, even

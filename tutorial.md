@@ -72,7 +72,7 @@ instance will return the bytes copies in a `Long`. Note that`IO` is
 parameterized by the return type). Now, let's start implementing our funtion.
 First, we need to open two streams that will read and write file contents. 
 
-### Acquiring and releasing resources
+### Acquiring and releasing `Resource`s
 We consider opening an stream to be a side-effect action, so we have to
 encapsulate those actions in their own `IO` instances. For this, we will make
 use of cats-effect `Resource`, that allows to orderly create, use and then
@@ -397,8 +397,8 @@ your IO-kungfu:
    subfolders, then their contents must be recursively copied too. Of course the
    copying must be safely cancelable at any moment.
 
-A concurrent system: echo server
---------------------------------
+A concurrent system with `Fiber`s: echo server
+----------------------------------------------
 This example is a bit more complex. Here we create an echo TCP server that
 simply replies to each text message from a client sending back that same
 message. When the client sends an empty line its connection is shutdown by the
@@ -889,7 +889,7 @@ def loop(reader: BufferedReader, writer: BufferedWriter, stopFlag: MVar[IO, Unit
 The resulting server code is [also
 available](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV3_ClosingClientsOnShutdown).
 
-Fibers are not threads!<a name="fibers-are-not-threads"></a>
+`Fiber`s are not threads!<a name="fibers-are-not-threads"></a>
 --------------------------------
 As stated before, fibers are like 'light' threads, meaning they can be used in a
 similar way than threads to create concurrent code. However, they are _not_

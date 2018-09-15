@@ -52,19 +52,19 @@ code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Inf
 <li><a href="#intro">Intro</a></li>
 <li><a href="#setting-things-up">Setting things up</a></li>
 <li><a href="#warming-up-copying-contents-of-a-file">Warming up: Copying contents of a file</a><ul>
-<li><a href="#acquiring-and-releasing-resources">Acquiring and releasing resources</a></li>
+<li><a href="#acquiring-and-releasing-resources">Acquiring and releasing <code>Resource</code>s</a></li>
 <li><a href="#what-about-bracket">What about <code>bracket</code>?</a></li>
 <li><a href="#copying-data">Copying data</a></li>
 <li><a href="#dealing-with-cancellation">Dealing with cancellation</a></li>
 <li><a href="#ioapp-for-our-final-program"><code>IOApp</code> for our final program</a></li>
 <li><a href="#exercises-improving-our-small-io-program">Exercises: improving our small <code>IO</code> program</a></li>
 </ul></li>
-<li><a href="#a-concurrent-system-echo-server">A concurrent system: echo server</a></li>
+<li><a href="#a-concurrent-system-with-fibers-echo-server">A concurrent system with <code>Fiber</code>s: echo server</a></li>
 <li><a href="#graceful-server-stop-handling-exit-events">Graceful server stop (handling exit events)</a><ul>
 <li><a href="#exercise-closing-client-connections-to-echo-server-on-shutdown">Exercise: closing client connections to echo server on shutdown</a></li>
 <li><a href="#solution">Solution</a></li>
 </ul></li>
-<li><a href="#fibers-are-not-threads">Fibers are not threads!<a name="fibers-are-not-threads"></a></a><ul>
+<li><a href="#fibers-are-not-threads"><code>Fiber</code>s are not threads!<a name="fibers-are-not-threads"></a></a><ul>
 <li><a href="#exercise-using-a-custom-thread-pool-in-echo-server">Exercise: using a custom thread pool in echo server</a></li>
 <li><a href="#solution-1">Solution</a></li>
 </ul></li>
@@ -105,7 +105,7 @@ scalacOptions ++= Seq(
 
 <span class="kw">def</span> <span class="fu">copy</span>(origin: File, destination: File): IO[Long] = ???</code></pre></div>
 <p>Nothing scary, uh? As we said before, the function just returns an <code>IO</code> instance. When run, all side-effects will be actually executed and the <code>IO</code> instance will return the bytes copies in a <code>Long</code>. Note that<code>IO</code> is parameterized by the return type). Now, let's start implementing our funtion. First, we need to open two streams that will read and write file contents.</p>
-<h3 id="acquiring-and-releasing-resources">Acquiring and releasing resources</h3>
+<h3 id="acquiring-and-releasing-resources">Acquiring and releasing <code>Resource</code>s</h3>
 <p>We consider opening an stream to be a side-effect action, so we have to encapsulate those actions in their own <code>IO</code> instances. For this, we will make use of cats-effect <code>Resource</code>, that allows to orderly create, use and then release resources. See this code:</p>
 <div class="sourceCode"><pre class="sourceCode scala"><code class="sourceCode scala"><span class="kw">import</span> cats.<span class="fu">effect</span>.{IO, Resource}
 <span class="kw">import</span> cats.<span class="fu">implicits</span>._ 
@@ -269,7 +269,7 @@ scalacOptions ++= Seq(
 <li>Use some other concurrency tool of cats-effect instead of <code>semaphore</code> to ensure mutual exclusion of <code>transfer</code> execution and streams closing.</li>
 <li>Create a new program able to copy folders. If the origin folder has subfolders, then their contents must be recursively copied too. Of course the copying must be safely cancelable at any moment.</li>
 </ol>
-<h2 id="a-concurrent-system-echo-server">A concurrent system: echo server</h2>
+<h2 id="a-concurrent-system-with-fibers-echo-server">A concurrent system with <code>Fiber</code>s: echo server</h2>
 <p>This example is a bit more complex. Here we create an echo TCP server that simply replies to each text message from a client sending back that same message. When the client sends an empty line its connection is shutdown by the server. This server will be able to attend several clients at the same time. For that we will use <code>cats-effect</code>'s <code>Fiber</code>, which can be seen as light threads. For each new client a <code>Fiber</code> instance will be spawned to serve that client.</p>
 <p>We will stick to a simple design principle: <em>whoever method creates a resource is the sole responsible of dispatching it!</em>. It's worth to remark this from the beginning to better understand the code listings shown in this tutorial.</p>
 <p>Let's build our server step-by-step. First we will code a method that implements the echo protocol. It will take as input the socket (<code>java.net.Socket</code> instance) that is connected to the client. The method will be basically a loop that at each iteration reads the input from the client, if the input is not an empty line then the text is sent back to the client, otherwise the method will finish.</p>
@@ -559,7 +559,7 @@ Connection closed by foreign host.</code></pre>
              }
   } <span class="kw">yield</span> ()</code></pre></div>
 <p>The resulting server code is <a href="https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV3_ClosingClientsOnShutdown">also available</a>.</p>
-<h2 id="fibers-are-not-threads">Fibers are not threads!<a name="fibers-are-not-threads"></a></h2>
+<h2 id="fibers-are-not-threads"><code>Fiber</code>s are not threads!<a name="fibers-are-not-threads"></a></h2>
 <p>As stated before, fibers are like 'light' threads, meaning they can be used in a similar way than threads to create concurrent code. However, they are <em>not</em> threads. Spawning new fibers does not guarantee that the action described in the <code>IO</code> associated to it will be run... immediately. At the end of the day, if no thread is available that can run the fiber, then the actions in that fiber will be blocked until some thread is available.</p>
 <p>You can test this yourself. Start the server defined in the previous sections and try to connect several clients and send lines to the server through them. Soon you will notice that the latest clients... do not get any echo reply when sending lines! Why is that? Well, the answer is that the first fibers already used all <em>underlying</em> threads available! But if we close one of the active clients by sending an empty line (recall that makes the server to close that client session) then immediately one of the blocked clients will be active.</p>
 <p>It shall be clear from that experiment than fibers are run by thread pools. And that in our case, all our fibers share the same thread pool! Which one in our case? Well, <code>IOApp</code> automatically brings a <code>Timer[IO]</code>, that is defined by cats-effect as a '<em>functional equivalente of Java's <a href="https://docs.oracle.com/javase/9/docs/api/java/util/concurrent/ScheduledExecutorService.html">ScheduledExecutorService</a></em>'. Each executor service has an underlying thread pool to execute the commands it is requested, and the same applies to <code>Timer</code>, which is in charge of assigning available threads to the pending <code>IO</code> actions. So there are our threads!</p>

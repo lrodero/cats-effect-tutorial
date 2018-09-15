@@ -4,7 +4,7 @@
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta http-equiv="Content-Style-Type" content="text/css" />
   <meta name="generator" content="pandoc" />
-  <title></title>
+  <title>Tutorial</title>
   <style type="text/css">code{white-space: pre;}</style>
   <style type="text/css">
 div.sourceCode { overflow-x: auto; }
@@ -46,10 +46,12 @@ code > span.in { color: #8f5902; font-weight: bold; font-style: italic; } /* Inf
   <link rel="stylesheet" href="pandoc.css" type="text/css" />
 </head>
 <body>
-<h1 id="cats-effect-tutorial">Cats-effect tutorial</h1>
-<h2 id="intro">Intro</h2>
-<p><a href="https://typelevel.org/cats-effect">Cats-effect</a>, the effects library for <a href="https://typelevel.org/cats">Cats</a>, has a complete documentation explaining the types it brings, full with small examples about how to use them. However, even with that documentation available, it can be a bit daunting start using the library for the first time.</p>
-<p>This tutorial tries to close that gap by means of coding examples. The first one it shows how we can use cats-effect to copy the contents from one file to another. That should help us to flex our muscles. The second one is a bit more complex. Step by step, we will build a light TCP server whose complexity will grow as we introduce more requirements. That growing complexity will help us to introduce more and more concepts from cats-effect.</p>
+<div id="header">
+<h1 class="title">Tutorial</h1>
+</div>
+<p><nav role="navigation" id="toc"></nav></p>
+<h2 id="introduction">Introduction</h2>
+<p>This tutorial tries to help newcomers to cats-effect to get familiar with its main concepts by means of code examples. The first one shows how we can use cats-effect to copy the contents from one file to another. That should help us to flex our muscles. The second one is a bit more elaborated. Step by step, we will build a light TCP server whose complexity will grow as we introduce more features. That growing complexity will help us to introduce more and more concepts from cats-effect.</p>
 <p>That said, let's go!</p>
 <h2 id="setting-things-up">Setting things up</h2>
 <p>The <a href="https://github.com/lrodero/cats-effect-tutorial">Github repo for this tutorial</a> includes all the software that will be developed during this tutorial. It uses <code>sbt</code> as the build tool. To ease coding, compiling and running the code snippets in this tutorial it is recommended to use the same <code>build.sbt</code>, or at least one with the same dependencies and compilation options:</p>

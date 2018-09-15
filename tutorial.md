@@ -1,26 +1,25 @@
-Cats-effect tutorial
-====================
+---
+layout: docsplus
+title:  "Tutorial"
+position: 2
+---
 
-Intro
------
+<nav role="navigation" id="toc"></nav>
 
-[Cats-effect](https://typelevel.org/cats-effect), the effects library for
-[Cats](https://typelevel.org/cats), has a complete documentation explaining the
-types it brings, full with small examples about how to use them. However, even
-with that documentation available, it can be a bit daunting start using the
-library for the first time.
+## Introduction
 
-This tutorial tries to close that gap by means of coding examples. The first one
-it shows how we can use cats-effect to copy the contents from one file to
-another. That should help us to flex our muscles. The second one is a bit more
-complex. Step by step, we will build a light TCP server whose complexity will
-grow as we introduce more requirements. That growing complexity will help us to
-introduce more and more concepts from cats-effect.
+This tutorial tries to help newcomers to cats-effect to get familiar with its
+main concepts by means of code examples. The first one shows how we can use
+cats-effect to copy the contents from one file to another. That should help us
+to flex our muscles. The second one is a bit more elaborated. Step by step, we
+will build a light TCP server whose complexity will grow as we introduce more
+features. That growing complexity will help us to introduce more and more
+concepts from cats-effect.
 
 That said, let's go!
 
-Setting things up
------------------
+## Setting things up
+
 The [Github repo for this
 tutorial](https://github.com/lrodero/cats-effect-tutorial) includes all the
 software that will be developed during this tutorial. It uses `sbt` as the build
@@ -46,8 +45,8 @@ scalacOptions ++= Seq(
   "-Ypartial-unification")
 ```
 
-Warming up: Copying contents of a file
---------------------------------------
+## Warming up: Copying contents of a file
+
 First we will code a function that copies the content from a file to another
 file. The function takes as parameters the source and destination files. But
 this is functional programming! So invoking the function will not copy anything,
@@ -347,6 +346,7 @@ And that is it! We are done, now we can create a program that uses this
 function.
 
 ### `IOApp` for our final program
+
 We will create a program that copies files, this program only takes two
 parameters: the name of the origin and destination files. For coding this
 program we will use `IOApp` as it allows to maintain purity in our definitions
@@ -381,6 +381,7 @@ functionality. If the function is cancelled while being run, still resources
 will be properly released.
 
 ### Exercises: improving our small `IO` program
+
 To finalize we propose you some exercises that will help you to keep improving
 your IO-kungfu:
 
@@ -397,8 +398,8 @@ your IO-kungfu:
    subfolders, then their contents must be recursively copied too. Of course the
    copying must be safely cancelable at any moment.
 
-A concurrent system with `Fiber`s: echo server
-----------------------------------------------
+## A concurrent system with `Fiber`s: echo server
+
 This example is a bit more complex. Here we create an echo TCP server that
 simply replies to each text message from a client sending back that same
 message. When the client sends an empty line its connection is shutdown by the
@@ -615,8 +616,8 @@ get a bit more complicated. We will deal with proper server halting in the next
 section.
 
 
-Graceful server stop (handling exit events)
--------------------------------------------
+## Graceful server stop (handling exit events)
+
 There is no way to shutdown gracefully the echo server coded in the previous
 version. Sure we can always `Ctrl-c` it, but proper servers should provide
 better mechanisms to stop them. In this section we use some other `cats-effect`
@@ -889,8 +890,8 @@ def loop(reader: BufferedReader, writer: BufferedWriter, stopFlag: MVar[IO, Unit
 The resulting server code is [also
 available](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV3_ClosingClientsOnShutdown).
 
-`Fiber`s are not threads!<a name="fibers-are-not-threads"></a>
---------------------------------
+## `Fiber`s are not threads!<a name="fibers-are-not-threads"></a>
+
 As stated before, fibers are like 'light' threads, meaning they can be used in a
 similar way than threads to create concurrent code. However, they are _not_
 threads. Spawning new fibers does not guarantee that the action described in the
@@ -1004,8 +1005,7 @@ the execution context as parameter. The resulting server code is [available in
 github](https://github.com/lrodero/cats-effect-tutorial/blob/master/src/main/scala/catsEffectTutorial/EchoServerV4_ClientThreadPool).
 
 
-Let's not forget about `async`
------------------------------
+## Let's not forget about `async`
 
 The `async` functionality is another powerful capability of cats-effect we have
 not mentioned yet. It allows to build `IO` instances that may be terminated by a
@@ -1101,8 +1101,7 @@ needed. Java NIO2 or netty could also be applicable to this scenario. We leave
 as a final exercise to implement again our echo server but this time using an
 async lib.
 
-Conclusion
-----------
+## Conclusion
 
 With all this we have covered a good deal of what cats-effect has to offer (but
 not all!). Now you are ready to use to create code that operate side effects in

@@ -1,7 +1,7 @@
 cats-effect-tutorial
 ====================
 
-Tutorial for [cats-effect](https://typelevel.org/cats-effect) written in markdown, resulting HTML is available [online](https://lrodero.github.io/cats-effect-tutorial/tutorial.html). Also the source code of the examples int the tutorial are available in this same repo as an `sbt` project.
+Markdown source of a tutorial for [cats-effect](https://typelevel.org/cats-effect). The tutorial is [available online](https://lrodero.github.io/cats-effect-tutorial/tutorial.html). Also the source code of the examples int the tutorial are available in this same repo as an `sbt` project.
 
 All contents are realeased under the [Apache v2 license](https://www.apache.org/licenses/LICENSE-2.0).
 

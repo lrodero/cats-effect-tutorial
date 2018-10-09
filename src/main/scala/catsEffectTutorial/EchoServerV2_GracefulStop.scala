@@ -75,15 +75,15 @@ object EchoServerV2_GracefulStop extends IOApp {
         case Right(socket) =>
           for { // accept() succeeded, we attend the client in its own Fiber
             _ <- echoProtocol(socket, stopFlag)
-              .guarantee(close(socket))   // We close the server whatever happens
-              .start                      // Client attended by its own Fiber
-              _ <- serve(serverSocket, stopFlag) // Looping back to the beginning
+                   .guarantee(close(socket))   // We close the server whatever happens
+                   .start                      // Client attended by its own Fiber
+            _ <- serve(serverSocket, stopFlag) // Looping back to the beginning
           } yield ()
         case Left(e) =>
           for { // accept() failed, stopFlag will tell us whether this is a graceful shutdown
             isEmpty <- stopFlag.isEmpty
             _       <- if(!isEmpty) IO.unit    // stopFlag is set, nothing to do
-            else IO.raiseError(e)   // stopFlag not set, must raise error
+                       else IO.raiseError(e)   // stopFlag not set, must raise error
           } yield ()
       }
     } yield ()

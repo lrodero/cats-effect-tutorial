@@ -33,7 +33,7 @@ object EchoServerV1_Simple extends IOApp {
       line <- IO(reader.readLine())
       _    <- line match {
                 case "" => IO.unit // Empty line, we are done
-                case _  => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer)
+                case _  => IO{ writer.write(line); writer.newLine(); writer.flush() } >> loop(reader, writer)
               }
     } yield ()
 
@@ -83,9 +83,9 @@ object EchoServerV1_Simple extends IOApp {
   
     IO( new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) )
       .bracket{
-        serverSocket => serve(serverSocket) *> IO.pure(ExitCode.Success)
+        serverSocket => serve(serverSocket) >> IO.pure(ExitCode.Success)
       } {
-        serverSocket => close(serverSocket) *> IO(println("Server finished"))
+        serverSocket => close(serverSocket) >> IO(println("Server finished"))
       }
   }
 }

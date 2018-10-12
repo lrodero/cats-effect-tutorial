@@ -34,7 +34,7 @@ object EchoServerV2_GracefulStop extends IOApp {
         _    <- line match {
                   case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
                   case ""     => IO.unit          // Empty line, we are done
-                  case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer, stopFlag)
+                  case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } >> loop(reader, writer, stopFlag)
                 }
       } yield ()
   
@@ -106,7 +106,7 @@ object EchoServerV2_GracefulStop extends IOApp {
       .bracket {
         serverSocket => server(serverSocket)
       } {
-        serverSocket => close(serverSocket)  *> IO(println("Server finished"))
+        serverSocket => close(serverSocket)  >> IO(println("Server finished"))
       }
   }
 }

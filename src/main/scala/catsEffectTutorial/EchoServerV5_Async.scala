@@ -47,7 +47,7 @@ object EchoServerV5_Async extends IOApp {
                    case Right(line) => line match {
                      case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
                      case ""     => IO.unit          // Empty line, we are done
-                     case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } *> loop(reader, writer, stopFlag)
+                     case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } >> loop(reader, writer, stopFlag)
                    }
                    case Left(e) =>
                      for { // readLine() failed, stopFlag will tell us whether this is a graceful shutdown
@@ -97,7 +97,7 @@ object EchoServerV5_Async extends IOApp {
             fiber <- echoProtocol(socket, stopFlag)
                        .guarantee(close(socket))      // We close the server whatever happens
                        .start                         // Client attended by its own Fiber
-            _     <- (stopFlag.read *> close(socket)) 
+            _     <- (stopFlag.read >> close(socket)) 
                        .start                         // Another Fiber to cancel the client when stopFlag is set
             _     <- serve(serverSocket, stopFlag)    // Looping to wait for the next client connection
           } yield ()
@@ -119,7 +119,7 @@ object EchoServerV5_Async extends IOApp {
     for {
       stopFlag     <- MVar[IO].empty[Unit]
       serverFiber  <- serve(serverSocket, stopFlag).start
-      _            <- stopFlag.read *> IO(println(s"Stopping server"))
+      _            <- stopFlag.read >> IO(println(s"Stopping server"))
       _            <- IO(clientsThreadPool.shutdown())
       _            <- serverFiber.cancel
     } yield ExitCode.Success
@@ -135,7 +135,7 @@ object EchoServerV5_Async extends IOApp {
       .bracket {
         serverSocket => server(serverSocket)
       } {
-        serverSocket => close(serverSocket)  *> IO(println("Server finished"))
+        serverSocket => close(serverSocket)  >> IO(println("Server finished"))
       }
   }
 }

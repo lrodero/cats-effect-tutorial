@@ -39,22 +39,18 @@ object CopyFile extends IOApp {
     Resource.make {
       IO(new FileInputStream(f))
     } { inStream => 
-      for  {
-       _ <- guard.acquire
-       _ <- IO(inStream.close()).handleErrorWith(_ => IO.unit)
-       _ <- guard.release
-      } yield ()
+      guard.withPermit {
+       IO(inStream.close()).handleErrorWith(_ => IO.unit)
+      }
     }
 
   def outputStream(f: File, guard: Semaphore[IO]): Resource[IO, FileOutputStream] =
     Resource.make {
       IO(new FileOutputStream(f))
     } { outStream =>
-      for  {
-       _ <- guard.acquire
-       _ <- IO(outStream.close()).handleErrorWith(_ => IO.unit)
-       _ <- guard.release
-      } yield ()
+      guard.withPermit {
+       IO(outStream.close()).handleErrorWith(_ => IO.unit)
+      }
     }
 
   def inputOutputStreams(in: File, out: File, guard: Semaphore[IO]): Resource[IO, (InputStream, OutputStream)] =
@@ -67,7 +63,7 @@ object CopyFile extends IOApp {
     for {
       guard <- Semaphore[IO](1)
       count <- inputOutputStreams(origin, destination, guard).use { case (in, out) => 
-                 guard.acquire >> transfer(in, out).guarantee(guard.release)
+                 guard.withPermit(transfer(in, out))
                }
     } yield count
 

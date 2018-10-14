@@ -20,7 +20,7 @@ import cats.effect.concurrent.Semaphore
 import cats.implicits._ 
 import java.io._ 
 
-object PolymorphicCopyFile extends IOApp {
+object CopyFilePolymorphic extends IOApp {
 
   def transmit[F[_]: Concurrent](origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): F[Long] =
     for {

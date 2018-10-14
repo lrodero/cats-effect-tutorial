@@ -22,38 +22,38 @@ import java.io._
 
 object CopyFilePolymorphic extends IOApp {
 
-  def transmit[F[_]: Concurrent](origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): F[Long] =
+  def transmit[F[_]: Sync](origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): F[Long] =
     for {
-      amount <- Concurrent[F].delay(origin.read(buffer, 0, buffer.size))
-      count  <- if(amount > -1) Concurrent[F].delay(destination.write(buffer, 0, amount)) >> transmit(origin, destination, buffer, acc + amount)
-                else Concurrent[F].pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
+      amount <- Sync[F].delay(origin.read(buffer, 0, buffer.size))
+      count  <- if(amount > -1) Sync[F].delay(destination.write(buffer, 0, amount)) >> transmit(origin, destination, buffer, acc + amount)
+                else Sync[F].pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
     } yield count // Returns the actual amount of bytes transmitted
 
-  def transfer[F[_]: Concurrent](origin: InputStream, destination: OutputStream): F[Long] =
+  def transfer[F[_]: Sync](origin: InputStream, destination: OutputStream): F[Long] =
     for {
-      buffer <- Concurrent[F].delay( new Array[Byte](1024 * 10) ) // Allocated only when F is evaluated
+      buffer <- Sync[F].delay( new Array[Byte](1024 * 10) ) // Allocated only when F is evaluated
       total  <- transmit(origin, destination, buffer, 0L)
     } yield total
 
-  def inputStream[F[_]: Concurrent](f: File, guard: Semaphore[F]): Resource[F, FileInputStream] =
+  def inputStream[F[_]: Sync](f: File, guard: Semaphore[F]): Resource[F, FileInputStream] =
     Resource.make {
-      Concurrent[F].delay(new FileInputStream(f))
+      Sync[F].delay(new FileInputStream(f))
     } { inStream => 
       guard.withPermit {
-        Concurrent[F].delay(inStream.close()).handleErrorWith(_ => Concurrent[F].unit)
+        Sync[F].delay(inStream.close()).handleErrorWith(_ => Sync[F].unit)
       }
     }
 
-  def outputStream[F[_]: Concurrent](f: File, guard: Semaphore[F]): Resource[F, FileOutputStream] =
+  def outputStream[F[_]: Sync](f: File, guard: Semaphore[F]): Resource[F, FileOutputStream] =
     Resource.make {
-      Concurrent[F].delay(new FileOutputStream(f))
+      Sync[F].delay(new FileOutputStream(f))
     } { outStream =>
       guard.withPermit {
-        Concurrent[F].delay(outStream.close()).handleErrorWith(_ => Concurrent[F].unit)
+        Sync[F].delay(outStream.close()).handleErrorWith(_ => Sync[F].unit)
       }
     }
 
-  def inputOutputStreams[F[_]: Concurrent](in: File, out: File, guard: Semaphore[F]): Resource[F, (InputStream, OutputStream)] =
+  def inputOutputStreams[F[_]: Sync](in: File, out: File, guard: Semaphore[F]): Resource[F, (InputStream, OutputStream)] =
     for {
       inStream  <- inputStream(in, guard)
       outStream <- outputStream(out, guard)

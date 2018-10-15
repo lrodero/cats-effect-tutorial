@@ -16,6 +16,7 @@
 package catsEffectTutorial
 
 import cats.effect._
+import cats.effect.ExitCase._
 import cats.implicits._
 
 import java.io._
@@ -68,11 +69,12 @@ object EchoServerV1_Simple extends IOApp {
       IO(socket.close()).handleErrorWith(_ => IO.unit)
   
     for {
-      socket <- IO(serverSocket.accept())
-      _      <- echoProtocol(socket)
-                  .guarantee(close(socket)) // We close the socket whatever happens
-                  .start                    // Client attended by its own Fiber!
-      _      <- serve(serverSocket)         // Looping back to the beginning
+      _ <- IO(serverSocket.accept())
+             .bracketCase(socket => echoProtocol(socket).guarantee(close(socket)).start){ (socket, exit) => exit match {
+               case Completed => IO.unit
+               case Error(_) | Canceled => close(socket)
+             }}
+      _ <- serve(serverSocket)         // Looping back to the beginning
     } yield ()
   }
 
@@ -80,7 +82,7 @@ object EchoServerV1_Simple extends IOApp {
   
     def close(socket: ServerSocket): IO[Unit] =
       IO(socket.close()).handleErrorWith(_ => IO.unit)
-  
+
     IO( new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) )
       .bracket{
         serverSocket => serve(serverSocket) >> IO.pure(ExitCode.Success)

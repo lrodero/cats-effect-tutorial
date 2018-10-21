@@ -71,16 +71,16 @@ object EchoServerV1_Simple extends IOApp {
 
     for {
       _ <- Sync[F]
-        .delay(serverSocket.accept())
-        .bracketCase { socket =>
-          echoProtocol(socket)
-            .guarantee(close(socket))                 // Ensuring socket is closed
-            .start                                    // Will run in its own Fiber!
-        }{ (socket, exit) => exit match {
-          case Completed => Sync[F].unit
-          case Error(_) | Canceled => close(socket)
-        }}
-            _ <- serve(serverSocket)                  // Looping back to the beginning
+             .delay(serverSocket.accept())
+             .bracketCase { socket =>
+               echoProtocol(socket)
+                 .guarantee(close(socket))            // Ensuring socket is closed
+                 .start                               // Client attended by its own Fiber
+             }{ (socket, exit) => exit match {
+               case Completed => Sync[F].unit
+               case Error(_) | Canceled => close(socket)
+             }}
+      _ <- serve(serverSocket)                        // Looping back to the beginning
     } yield ()
   }
 

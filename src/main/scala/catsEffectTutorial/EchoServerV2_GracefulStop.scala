@@ -16,6 +16,8 @@
 package catsEffectTutorial
 
 import cats.effect._
+import cats.effect.ExitCase._
+import cats.effect.syntax.all._
 import cats.effect.concurrent.MVar
 import cats.implicits._
 
@@ -26,33 +28,33 @@ import java.net._
  */
 object EchoServerV2_GracefulStop extends IOApp {
 
-  def echoProtocol(clientSocket: Socket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
+  def echoProtocol[F[_]: Sync](clientSocket: Socket, stopFlag: MVar[F, Unit]): F[Unit] = {
   
-    def loop(reader: BufferedReader, writer: BufferedWriter, stopFlag: MVar[IO, Unit]): IO[Unit] =
+    def loop(reader: BufferedReader, writer: BufferedWriter, stopFlag: MVar[F, Unit]): F[Unit] =
       for {
-        line <- IO(reader.readLine())
+        line <- Sync[F].delay(reader.readLine())
         _    <- line match {
-                  case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns IO[Unit] which is handy as we are done
-                  case ""     => IO.unit          // Empty line, we are done
-                  case _      => IO{ writer.write(line); writer.newLine(); writer.flush() } >> loop(reader, writer, stopFlag)
+                  case "STOP" => stopFlag.put(()) // Stopping server! Also put(()) returns F[Unit] which is handy as we are done
+                  case ""     => Sync[F].unit     // Empty line, we are done
+                  case _      => Sync[F].delay{ writer.write(line); writer.newLine(); writer.flush() } >> loop(reader, writer, stopFlag)
                 }
       } yield ()
   
-    def reader(clientSocket: Socket): Resource[IO, BufferedReader] =
+    def reader(clientSocket: Socket): Resource[F, BufferedReader] =
       Resource.make {
-        IO( new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) )
+        Sync[F].delay( new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) )
       } { reader =>
-        IO(reader.close()).handleErrorWith(_ => IO.unit)
+        Sync[F].delay(reader.close()).handleErrorWith(_ => Sync[F].unit)
       }
   
-    def writer(clientSocket: Socket): Resource[IO, BufferedWriter] =
+    def writer(clientSocket: Socket): Resource[F, BufferedWriter] =
       Resource.make {
-        IO( new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) )
+        Sync[F].delay( new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) )
       } { writer =>
-        IO(writer.close()).handleErrorWith(_ => IO.unit)
+        Sync[F].delay(writer.close()).handleErrorWith(_ => Sync[F].unit)
       }
 
-    def readerWriter(clientSocket: Socket): Resource[IO, (BufferedReader, BufferedWriter)] =
+    def readerWriter(clientSocket: Socket): Resource[F, (BufferedReader, BufferedWriter)] =
       for {
         reader <- reader(clientSocket)
         writer <- writer(clientSocket)
@@ -64,49 +66,45 @@ object EchoServerV2_GracefulStop extends IOApp {
 
   }
 
-  def serve(serverSocket: ServerSocket, stopFlag: MVar[IO, Unit]): IO[Unit] = {
+  def serve[F[_]: Concurrent](serverSocket: ServerSocket, stopFlag: MVar[F, Unit]): F[Unit] = {
 
-    def close(socket: Socket): IO[Unit] = 
-      IO(socket.close()).handleErrorWith(_ => IO.unit)
-
+    def close(socket: Socket): F[Unit] = 
+      Sync[F].delay(socket.close()).handleErrorWith(_ => Sync[F].unit)
+    
     for {
-      socketE <- IO(serverSocket.accept()).attempt
-      _       <- socketE match {
-        case Right(socket) =>
-          for { // accept() succeeded, we attend the client in its own Fiber
-            _ <- echoProtocol(socket, stopFlag)
-                   .guarantee(close(socket))   // We close the server whatever happens
-                   .start                      // Client attended by its own Fiber
-            _ <- serve(serverSocket, stopFlag) // Looping back to the beginning
-          } yield ()
-        case Left(e) =>
-          for { // accept() failed, stopFlag will tell us whether this is a graceful shutdown
-            isEmpty <- stopFlag.isEmpty
-            _       <- if(!isEmpty) IO.unit    // stopFlag is set, nothing to do
-                       else IO.raiseError(e)   // stopFlag not set, must raise error
-          } yield ()
-      }
+      _ <- Sync[F]
+             .delay(serverSocket.accept())
+             .bracketCase { socket =>
+               echoProtocol(socket, stopFlag)
+                 .guarantee(close(socket))                 // Ensuring socket is closed
+                 .start                                    // Client attended by its own Fiber
+             }{ (socket, exit) => exit match {
+               case Completed => Sync[F].unit
+               case Error(_) | Canceled => close(socket)
+             }}
+      _ <- serve(serverSocket, stopFlag)                   // Looping back to the beginning
     } yield ()
+
   }
 
-  def server(serverSocket: ServerSocket): IO[ExitCode] =
+  def server[F[_]: Concurrent](serverSocket: ServerSocket): F[ExitCode] =
     for {
-      stopFlag    <- MVar[IO].empty[Unit]
+      stopFlag    <- MVar[F].empty[Unit]
       serverFiber <- serve(serverSocket, stopFlag).start // Server runs on its own Fiber
       _           <- stopFlag.read                       // Blocked until 'stopFlag.put(())' is run
       _           <- serverFiber.cancel                  // Stopping server!
     } yield ExitCode.Success
 
   override def run(args: List[String]): IO[ExitCode] = {
-
-    def close(socket: ServerSocket): IO[Unit] =
-      IO(socket.close()).handleErrorWith(_ => IO.unit)
+  
+    def close[F[_]: Sync](socket: ServerSocket): F[Unit] =
+      Sync[F].delay(socket.close()).handleErrorWith(_ => Sync[F].unit)
 
     IO( new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) )
-      .bracket {
-        serverSocket => server(serverSocket)
+      .bracket{
+        serverSocket => server[IO](serverSocket) >> IO.pure(ExitCode.Success)
       } {
-        serverSocket => close(serverSocket)  >> IO(println("Server finished"))
+        serverSocket => close[IO](serverSocket)  >> IO(println("Server finished"))
       }
   }
 }

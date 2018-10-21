@@ -17,6 +17,7 @@ package catsEffectTutorial
 
 import cats.effect._
 import cats.effect.ExitCase._
+import cats.effect.syntax.all._
 import cats.implicits._
 
 import java.io._
@@ -28,31 +29,31 @@ import java.net._
  */
 object EchoServerV1_Simple extends IOApp {
 
-  def echoProtocol(clientSocket: Socket): IO[Unit] = {
+  def echoProtocol[F[_]: Sync](clientSocket: Socket): F[Unit] = {
   
-    def loop(reader: BufferedReader, writer: BufferedWriter): IO[Unit] = for {
-      line <- IO(reader.readLine())
+    def loop(reader: BufferedReader, writer: BufferedWriter): F[Unit] = for {
+      line <- Sync[F].delay(reader.readLine())
       _    <- line match {
-                case "" => IO.unit // Empty line, we are done
-                case _  => IO{ writer.write(line); writer.newLine(); writer.flush() } >> loop(reader, writer)
+                case "" => Sync[F].unit // Empty line, we are done
+                case _  => Sync[F].delay{ writer.write(line); writer.newLine(); writer.flush() } >> loop(reader, writer)
               }
     } yield ()
 
-    def reader(clientSocket: Socket): Resource[IO, BufferedReader] =
+    def reader(clientSocket: Socket): Resource[F, BufferedReader] =
       Resource.make {
-        IO( new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) )
+        Sync[F].delay( new BufferedReader(new InputStreamReader(clientSocket.getInputStream())) )
       } { reader =>
-        IO(reader.close()).handleErrorWith(_ => IO.unit)
+        Sync[F].delay(reader.close()).handleErrorWith(_ => Sync[F].unit)
       }
   
-    def writer(clientSocket: Socket): Resource[IO, BufferedWriter] =
+    def writer(clientSocket: Socket): Resource[F, BufferedWriter] =
       Resource.make {
-        IO( new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) )
+        Sync[F].delay( new BufferedWriter(new PrintWriter(clientSocket.getOutputStream())) )
       } { writer =>
-        IO(writer.close()).handleErrorWith(_ => IO.unit)
+        Sync[F].delay(writer.close()).handleErrorWith(_ => Sync[F].unit)
       }
 
-    def readerWriter(clientSocket: Socket): Resource[IO, (BufferedReader, BufferedWriter)] =
+    def readerWriter(clientSocket: Socket): Resource[F, (BufferedReader, BufferedWriter)] =
       for {
         reader <- reader(clientSocket)
         writer <- writer(clientSocket)
@@ -64,30 +65,35 @@ object EchoServerV1_Simple extends IOApp {
 
   }
 
-  def serve(serverSocket: ServerSocket): IO[Unit] = {
-    def close(socket: Socket): IO[Unit] = 
-      IO(socket.close()).handleErrorWith(_ => IO.unit)
-  
+  def serve[F[_]: Concurrent](serverSocket: ServerSocket): F[Unit] = {
+    def close(socket: Socket): F[Unit] = 
+      Sync[F].delay(socket.close()).handleErrorWith(_ => Sync[F].unit)
+
     for {
-      _ <- IO(serverSocket.accept())
-             .bracketCase(socket => echoProtocol(socket).guarantee(close(socket)).start){ (socket, exit) => exit match {
-               case Completed => IO.unit
-               case Error(_) | Canceled => close(socket)
-             }}
-      _ <- serve(serverSocket)         // Looping back to the beginning
+      _ <- Sync[F]
+        .delay(serverSocket.accept())
+        .bracketCase { socket =>
+          echoProtocol(socket)
+            .guarantee(close(socket))                 // Ensuring socket is closed
+            .start                                    // Will run in its own Fiber!
+        }{ (socket, exit) => exit match {
+          case Completed => Sync[F].unit
+          case Error(_) | Canceled => close(socket)
+        }}
+            _ <- serve(serverSocket)                  // Looping back to the beginning
     } yield ()
   }
 
   override def run(args: List[String]): IO[ExitCode] = {
   
-    def close(socket: ServerSocket): IO[Unit] =
-      IO(socket.close()).handleErrorWith(_ => IO.unit)
+    def close[F[_]: Sync](socket: ServerSocket): F[Unit] =
+      Sync[F].delay(socket.close()).handleErrorWith(_ => Sync[F].unit)
 
     IO( new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) )
       .bracket{
-        serverSocket => serve(serverSocket) >> IO.pure(ExitCode.Success)
+        serverSocket => serve[IO](serverSocket) >> IO.pure(ExitCode.Success)
       } {
-        serverSocket => close(serverSocket) >> IO(println("Server finished"))
+        serverSocket => close[IO](serverSocket) >> IO(println("Server finished"))
       }
   }
 }

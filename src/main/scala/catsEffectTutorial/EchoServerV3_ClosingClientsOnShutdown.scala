@@ -102,7 +102,7 @@ object EchoServerV3_ClosingClientsOnShutdown extends IOApp {
       stopFlag    <- MVar[F].empty[Unit]
       serverFiber <- serve(serverSocket, stopFlag).start // Server runs on its own Fiber
       _           <- stopFlag.read                       // Blocked until 'stopFlag.put(())' is run
-      _           <- serverFiber.cancel                  // Stopping server!
+      _           <- serverFiber.cancel.start            // Stopping server!
     } yield ExitCode.Success
 
   override def run(args: List[String]): IO[ExitCode] = {

@@ -112,7 +112,7 @@ object EchoServerV4_ClientThreadPool extends IOApp {
       serverFiber <- serve(serverSocket, stopFlag).start         // Server runs on its own Fiber
       _           <- stopFlag.read                               // Blocked until 'stopFlag.put(())' is run
       _           <- Sync[F].delay(clientsThreadPool.shutdown()) // Shutting down clients pool
-      _           <- serverFiber.cancel                          // Stopping server
+      _           <- serverFiber.cancel.start                    // Stopping server
     } yield ExitCode.Success
 
   }

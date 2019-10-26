@@ -24,7 +24,7 @@ object CopyFilePolymorphic extends IOApp {
 
   def transmit[F[_]: Sync](origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): F[Long] =
     for {
-      amount <- Sync[F].delay(origin.read(buffer, 0, buffer.size))
+      amount <- Sync[F].delay(origin.read(buffer, 0, buffer.length))
       count  <- if(amount > -1) Sync[F].delay(destination.write(buffer, 0, amount)) >> transmit(origin, destination, buffer, acc + amount)
                 else Sync[F].pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
     } yield count // Returns the actual amount of bytes transmitted
@@ -72,8 +72,8 @@ object CopyFilePolymorphic extends IOApp {
     for {
       _      <- if(args.length < 2) IO.raiseError(new IllegalArgumentException("Need origin and destination files"))
                 else IO.unit
-      orig = new File(args(0))
-      dest = new File(args(1))
+      orig = new File(args.head)
+      dest = new File(args.tail.head)
       count <- copy[IO](orig, dest)
       _     <- IO(println(s"$count bytes copied from ${orig.getPath} to ${dest.getPath}"))
     } yield ExitCode.Success

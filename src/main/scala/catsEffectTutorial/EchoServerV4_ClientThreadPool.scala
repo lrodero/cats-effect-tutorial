@@ -124,7 +124,7 @@ object EchoServerV4_ClientThreadPool extends IOApp {
 
     IO( new ServerSocket(args.headOption.map(_.toInt).getOrElse(5432)) )
       .bracket {
-        serverSocket => server[IO](serverSocket)
+        serverSocket => server[IO](serverSocket) >> IO.pure(ExitCode.Success)
       } {
         serverSocket => close[IO](serverSocket)  >> IO(println("Server finished"))
       }

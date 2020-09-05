@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2018 Luis Rodero-Merino
+ * Copyright (c) 2020 Luis Rodero-Merino
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * You may obtain a copy of the License at.
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -13,13 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package catsEffectTutorial
+package catseffecttutorial.copyfile
 
-import cats.effect._
+import java.io._
+
 import cats.effect.concurrent.Semaphore
-import cats.implicits._ 
-import java.io._ 
+import cats.effect.{Concurrent, ExitCode, IO, IOApp, Resource, Sync}
+import cats.syntax.all._
 
+/**
+ * Simple IO-based program to copy files. First part of cats-effect tutorial
+ * at https://typelevel.org/cats-effect/tutorial/tutorial.html. This code is
+ * a polymorphic version of [[CopyFile]] program.
+ */
 object CopyFilePolymorphic extends IOApp {
 
   def transmit[F[_]: Sync](origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): F[Long] =
@@ -38,7 +44,7 @@ object CopyFilePolymorphic extends IOApp {
   def inputStream[F[_]: Sync](f: File, guard: Semaphore[F]): Resource[F, FileInputStream] =
     Resource.make {
       Sync[F].delay(new FileInputStream(f))
-    } { inStream => 
+    } { inStream =>
       guard.withPermit {
         Sync[F].delay(inStream.close()).handleErrorWith(_ => Sync[F].unit)
       }
@@ -59,15 +65,14 @@ object CopyFilePolymorphic extends IOApp {
       outStream <- outputStream(out, guard)
     } yield (inStream, outStream)
 
-  def copy[F[_]: Concurrent](origin: File, destination: File): F[Long] = 
+  def copy[F[_]: Concurrent](origin: File, destination: File): F[Long] =
     for {
       guard <- Semaphore[F](1)
-      count <- inputOutputStreams(origin, destination, guard).use { case (in, out) => 
+      count <- inputOutputStreams(origin, destination, guard).use { case (in, out) =>
                  guard.withPermit(transfer(in, out))
                }
     } yield count
 
-  // The 'main' function of IOApp //
   override def run(args: List[String]): IO[ExitCode] =
     for {
       _      <- if(args.length < 2) IO.raiseError(new IllegalArgumentException("Need origin and destination files"))

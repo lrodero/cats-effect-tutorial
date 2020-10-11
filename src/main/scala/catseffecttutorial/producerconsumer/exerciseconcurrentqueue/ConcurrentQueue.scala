@@ -184,7 +184,7 @@ object ConcurrentQueue {
             _ <- assertNonNegative(n)
             acquired <- filled.tryAcquireN(n)
             asO <-
-              if(!acquired) F.pure(Option.empty[List[A]])
+              if(!acquired) F.pure(None)
               else queueR.modify(_.splitAt(n).swap).map(Option(_)) >>= {asO =>
                 empty.releaseN(n).as(asO)
               }
@@ -197,8 +197,7 @@ object ConcurrentQueue {
           for {
             _ <- assertNonNegative(n)
             acquired <- filled.tryAcquireN(n)
-            asO <- if(!acquired) F.pure(None)
-            else
+            asO <-
               if(!acquired) F.pure(None)
               else queueR.modify(queue => (queue, queue.take(n))).map(Option(_)) >>= { asO =>
                 filled.releaseN(n).as(asO)
@@ -211,8 +210,9 @@ object ConcurrentQueue {
         else F.uncancelable(
           for {
             acquired <- empty.tryAcquireN(as.size)
-            _ <- if(!acquired) F.unit
-            else queueR.update(_ ++ as) >> filled.releaseN(as.size)
+            _ <-
+              if(!acquired) F.unit
+              else queueR.update(_ ++ as) >> filled.releaseN(as.size)
           } yield acquired
         )
 
@@ -276,7 +276,7 @@ object ConcurrentQueue {
             _ <- assertNonNegative(n)
             acquired <- filled.tryAcquireN(n)
             asO <-
-              if(!acquired) F.pure(Option.empty[List[A]])
+              if(!acquired) F.pure(None)
               else queueR.modify(_.splitAt(n).swap).map(Option(_))
           } yield asO.map(_.toList)
         )

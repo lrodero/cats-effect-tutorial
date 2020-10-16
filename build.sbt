@@ -2,7 +2,7 @@ name := "cats-effect-tutorial"
 
 version := "2.2.0"
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.12.12"
 
 libraryDependencies += "org.typelevel" %% "cats-effect" % "2.2.0" withSources() withJavadoc()
 

@@ -75,12 +75,11 @@ object CopyFilePolymorphic extends IOApp {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      _      <- if(args.length < 2) IO.raiseError(new IllegalArgumentException("Need origin and destination files"))
-                else IO.unit
+      _      <- IO.raiseWhen(args.length < 2)(new IllegalArgumentException("Need origin and destination files"))
       orig = new File(args.head)
       dest = new File(args.tail.head)
-      count <- copy[IO](orig, dest)
-      _     <- IO(println(s"$count bytes copied from ${orig.getPath} to ${dest.getPath}"))
+      count  <- copy[IO](orig, dest)
+      _      <- IO(println(s"$count bytes copied from ${orig.getPath} to ${dest.getPath}"))
     } yield ExitCode.Success
 
 }

@@ -15,8 +15,8 @@
  */
 package catseffecttutorial.producerconsumer
 
-import cats.effect.concurrent.{Ref, Semaphore}
-import cats.effect.{ContextShift, ExitCode, IO, IOApp, Sync}
+import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.{Concurrent, ContextShift, ExitCode, IO, IOApp, Sync}
 import cats.instances.list._
 import cats.syntax.all._
 
@@ -26,33 +26,62 @@ import scala.collection.immutable.Queue
  * Multiple producer - multiple consumer system using an unbounded concurrent queue.
  *
  * Second part of cats-effect tutorial at https://typelevel.org/cats-effect/tutorial/tutorial.html
+ *
+ * Code to _offer_ and _take_ elements to/from queue is taken from CE3's Queue implementation.
  */
 object ProducerConsumer extends IOApp {
 
-  def producer[F[_]: Sync: ContextShift](id: Int, queueR: Ref[F, Queue[Int]], counterR: Ref[F, Int], filled: Semaphore[F]): F[Unit] =
+  case class State[F[_], A](queue: Queue[A], takers: Queue[Deferred[F,A]])
+
+  object State {
+    def empty[F[_], A]: State[F, A] = State(Queue.empty, Queue.empty)
+  }
+
+  def producer[F[_]: Sync: ContextShift](id: Int, counterR: Ref[F, Int], stateR: Ref[F, State[F,Int]]): F[Unit] = {
+
+    def offer(i: Int): F[Unit] =
+      stateR.modify {
+        case State(queue, takers) if takers.nonEmpty =>
+          val (taker, rest) = takers.dequeue
+          State(queue, rest) -> taker.complete(i).void
+        case State(queue, takers) =>
+          State(queue.enqueue(i), takers) -> Sync[F].unit
+      }.flatten
+
     (for {
       i <- counterR.getAndUpdate(_ + 1)
-      _ <- queueR.getAndUpdate(_.enqueue(i))
-      _ <- filled.release // Signal new item in queue
+      _ <- offer(i)
       _ <- if(i % 10000 == 0) Sync[F].delay(println(s"Producer $id has reached $i items")) else Sync[F].unit
       _ <- ContextShift[F].shift
-    } yield ()) >> producer(id, queueR, counterR, filled)
+    } yield ()) >> producer(id, counterR, stateR)
+  }
 
-  def consumer[F[_]: Sync: ContextShift](id: Int, queueR: Ref[F, Queue[Int]], filled: Semaphore[F]): F[Unit] =
+  def consumer[F[_]: Concurrent: ContextShift](id: Int, stateR: Ref[F, State[F, Int]]): F[Unit] = {
+
+    val take: F[Int] =
+      Deferred[F, Int].flatMap { taker =>
+        stateR.modify {
+          case State(queue, takers) if queue.nonEmpty =>
+            val (i, rest) = queue.dequeue
+            State(rest, takers) -> Sync[F].pure(i)
+          case State(queue, takers) =>
+            State(queue, takers.enqueue(taker)) -> taker.get
+        }.flatten
+      }
+
     (for {
-      _ <- filled.acquire // Wait for some item in queue
-      i <- queueR.modify(_.dequeue.swap)
+      i <- take
       _ <- if(i % 10000 == 0) Sync[F].delay(println(s"Consumer $id has reached $i items")) else Sync[F].unit
       _ <- ContextShift[F].shift
-    } yield ()) >> consumer(id, queueR, filled)
+    } yield ()) >> consumer(id, stateR)
+  }
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      queueR <- Ref.of[IO, Queue[Int]](Queue.empty[Int])
+      stateR <- Ref.of[IO, State[IO,Int]](State.empty[IO, Int])
       counterR <- Ref.of[IO, Int](1)
-      filled <- Semaphore[IO](0)
-      producers = List.range(1, 11).map(producer(_, queueR, counterR, filled)) // 10 producers
-      consumers = List.range(1, 11).map(consumer(_, queueR, filled))           // 10 consumers
+      producers = List.range(1, 11).map(producer(_, counterR, stateR)) // 10 producers
+      consumers = List.range(1, 11).map(consumer(_, stateR))           // 10 consumers
       res <- (producers ++ consumers)
         .parSequence.as(ExitCode.Success) // Run producers and consumers in parallel until done (likely by user cancelling with CTRL-C)
         .handleErrorWith { t =>

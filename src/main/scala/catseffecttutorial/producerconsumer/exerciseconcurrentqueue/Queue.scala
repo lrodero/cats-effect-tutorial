@@ -126,18 +126,20 @@ object Queue {
 
     def offer(a: A): F[Unit] =
       Deferred[F,Unit].flatMap { offerer =>
-        val cleanup = state.update { s => s.copy(offerers = s.offerers.filter(_._2 ne offerer)) }
-        state.modify {
-          case State(queue, size, takers, offerers) if takers.nonEmpty =>
-            val (taker, rest) = takers.dequeue
-            State(queue, size, rest, offerers) -> taker.complete(a).void
+        F.uncancelable {
+          state.modify {
+            case State(queue, size, takers, offerers) if takers.nonEmpty =>
+              val (taker, rest) = takers.dequeue
+              State(queue, size, rest, offerers) -> taker.complete(a).void
 
-          case State(queue, size, takers, offerers) if size < capacity =>
-            State(queue.enqueue(a), size + 1, takers, offerers) -> F.unit
+            case State(queue, size, takers, offerers) if size < capacity =>
+              State(queue.enqueue(a), size + 1, takers, offerers) -> F.unit
 
-          case State(queue, size, takers, offerers) => // Neither taker present nor capacity available in queue, 'blocking' call
-            State(queue, size, takers, offerers.enqueue(a -> offerer)) -> offerer.get
-        }.flatten.onCancel(cleanup)
+            case State(queue, size, takers, offerers) => // Neither taker present nor capacity available in queue, 'blocking' call
+              val cleanup = state.update { s => s.copy(offerers = s.offerers.filter(_._2 ne offerer)) }
+              State(queue, size, takers, offerers.enqueue(a -> offerer)) -> offerer.get.onCancel(cleanup)
+          }.flatten
+        }
       }
 
     def tryOffer(a: A): F[Boolean] =
@@ -158,24 +160,26 @@ object Queue {
 
     val take: F[A] =
       Deferred[F, A].flatMap { taker =>
-        val cleanup = state.update { s => s.copy(takers = s.takers.filter(_ ne taker)) }
-        state.modify {  // cancellation inside modify has not effect
-          case State(queue, size, takers, offerers) if queue.nonEmpty && offerers.isEmpty =>
-            val (a, rest) = queue.dequeue
-            State(rest, size - 1, takers, offerers) -> F.pure(a)
+        F.uncancelable {
+          state.modify {
+            case State(queue, size, takers, offerers) if queue.nonEmpty && offerers.isEmpty =>
+              val (a, rest) = queue.dequeue
+              State(rest, size - 1, takers, offerers) -> F.pure(a)
 
-          case State(queue, size, takers, offerers) if queue.nonEmpty =>
-            val (a, rest) = queue.dequeue
-            val ((move, release), tail) = offerers.dequeue
-            State(rest.enqueue(move), size, takers, tail) -> release.complete(()).as(a)
+            case State(queue, size, takers, offerers) if queue.nonEmpty =>
+              val (a, rest) = queue.dequeue
+              val ((move, release), tail) = offerers.dequeue
+              State(rest.enqueue(move), size, takers, tail) -> release.complete(()).as(a)
 
-          case State(queue, size, takers, offerers) if offerers.nonEmpty =>
-            val ((a, release), rest) = offerers.dequeue
-            State(queue, size, takers, rest) -> release.complete(()).as(a)
+            case State(queue, size, takers, offerers) if offerers.nonEmpty =>
+              val ((a, release), rest) = offerers.dequeue
+              State(queue, size, takers, rest) -> release.complete(()).as(a)
 
-          case State(queue, size, takers, offerers) => // No offerer present and queue empty, 'blocking' call
-            State(queue, size, takers.enqueue(taker), offerers) -> taker.get
-        }.flatten.onCancel(cleanup)
+            case State(queue, size, takers, offerers) => // No offerer present and queue empty, 'blocking' call
+              val cleanup = state.update { s => s.copy(takers = s.takers.filter(_ ne taker)) }
+              State(queue, size, takers.enqueue(taker), offerers) -> taker.get.onCancel(cleanup)
+          }.flatten
+        }
       }
 
     val tryTake: F[Option[A]] =

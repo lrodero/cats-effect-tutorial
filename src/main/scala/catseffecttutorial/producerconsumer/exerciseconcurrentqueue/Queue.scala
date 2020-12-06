@@ -126,20 +126,18 @@ object Queue {
 
     def offer(a: A): F[Unit] =
       Deferred[F,Unit].flatMap { offerer =>
-        F.uncancelable {
-          state.modify {
-            case State(queue, size, takers, offerers) if takers.nonEmpty =>
-              val (taker, rest) = takers.dequeue
-              State(queue, size, rest, offerers) -> taker.complete(a).void
+        val cleanup = state.update { s => s.copy(offerers = s.offerers.filter(_._2 ne offerer)) }
+        state.modify {
+          case State(queue, size, takers, offerers) if takers.nonEmpty =>
+            val (taker, rest) = takers.dequeue
+            State(queue, size, rest, offerers) -> taker.complete(a).uncancelable.void
 
-            case State(queue, size, takers, offerers) if size < capacity =>
-              State(queue.enqueue(a), size + 1, takers, offerers) -> F.unit
+          case State(queue, size, takers, offerers) if size < capacity =>
+            State(queue.enqueue(a), size + 1, takers, offerers) -> F.unit
 
-            case State(queue, size, takers, offerers) => // Neither taker present nor capacity available in queue, 'blocking' call
-              val cleanup = state.update { s => s.copy(offerers = s.offerers.filter(_._2 ne offerer)) }
-              State(queue, size, takers, offerers.enqueue(a -> offerer)) -> offerer.get.onCancel(cleanup)
-          }.flatten
-        }
+          case State(queue, size, takers, offerers) => // Neither taker present nor capacity available in queue, 'blocking' call
+            State(queue, size, takers, offerers.enqueue(a -> offerer)) -> offerer.get
+        }.flatten.onCancel(cleanup)
       }
 
     def tryOffer(a: A): F[Boolean] =

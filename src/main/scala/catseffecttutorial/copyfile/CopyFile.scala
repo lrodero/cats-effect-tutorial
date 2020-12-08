@@ -15,11 +15,10 @@
  */
 package catseffecttutorial.copyfile
 
-import java.io._
-
-import cats.effect.concurrent.Semaphore
 import cats.effect.{ExitCode, IO, IOApp, Resource}
-import cats.syntax.all._
+import cats.effect.std.Semaphore
+
+import java.io._
 
 /**
  * Simple IO-based program to copy files. First part of cats-effect tutorial
@@ -46,7 +45,7 @@ object CopyFile extends IOApp {
     Resource.make {
       IO(new FileInputStream(f))
     } { inStream =>
-      guard.withPermit {
+      guard.permit.use { _ =>
         IO(inStream.close()).handleErrorWith(_ => IO.unit)
       }
     }
@@ -55,7 +54,7 @@ object CopyFile extends IOApp {
     Resource.make {
       IO(new FileOutputStream(f))
     } { outStream =>
-      guard.withPermit {
+      guard.permit.use{ _ =>
         IO(outStream.close()).handleErrorWith(_ => IO.unit)
       }
     }
@@ -70,18 +69,22 @@ object CopyFile extends IOApp {
     for {
       guard <- Semaphore[IO](1)
       count <- inputOutputStreams(origin, destination, guard).use { case (in, out) =>
-        guard.withPermit(transfer(in, out))
+        guard.permit.use { _ =>
+          transfer(in, out)
+        }
       }
     } yield count
 
   override def run(args: List[String]): IO[ExitCode] =
-    for {
+    (for {
       _ <- if (args.length < 2) IO.raiseError(new IllegalArgumentException("Need origin and destination files"))
       else IO.unit
       orig = new File(args.head)
       dest = new File(args.tail.head)
       count <- copy(orig, dest)
       _ <- IO(println(s"$count bytes copied from ${orig.getPath} to ${dest.getPath}"))
-    } yield ExitCode.Success
+    } yield ExitCode.Success).handleErrorWith{ t =>
+      IO(t.printStackTrace()).as(ExitCode.Error)
+    }
 
 }

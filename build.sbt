@@ -1,8 +1,8 @@
 name := "cats-effect-tutorial"
 
-version := "2.2.0"
+version := "3.3.0-M4"
 
-scalaVersion := "2.12.12"
+scalaVersion := "2.13.3"
 
 libraryDependencies += "org.typelevel" %% "cats-effect" % "3.0.0-M4" withSources() withJavadoc()
 
@@ -11,5 +11,4 @@ scalacOptions ++= Seq(
   "-deprecation",
   "-unchecked",
   "-language:postfixOps",
-  "-language:higherKinds",
-  "-Ypartial-unification")
+  "-language:higherKinds")

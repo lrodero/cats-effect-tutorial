@@ -15,11 +15,11 @@
  */
 package catseffecttutorial.copyfile
 
-import java.io._
-
-import cats.effect.concurrent.Semaphore
-import cats.effect.{Concurrent, ExitCode, IO, IOApp, Resource, Sync}
+import cats.effect.{Async, ExitCode, IO, IOApp, Resource, Sync}
+import cats.effect.std.Semaphore
 import cats.syntax.all._
+
+import java.io._
 
 /**
  * Simple IO-based program to copy files. First part of cats-effect tutorial
@@ -41,35 +41,35 @@ object CopyFilePolymorphic extends IOApp {
       total  <- transmit(origin, destination, buffer, 0L)
     } yield total
 
-  def inputStream[F[_]: Sync](f: File, guard: Semaphore[F]): Resource[F, FileInputStream] =
+  def inputStream[F[_]: Async](f: File, guard: Semaphore[F]): Resource[F, FileInputStream] =
     Resource.make {
-      Sync[F].delay(new FileInputStream(f))
+      Async[F].delay(new FileInputStream(f))
     } { inStream =>
-      guard.withPermit {
-        Sync[F].delay(inStream.close()).handleErrorWith(_ => Sync[F].unit)
+      guard.permit.use { _ =>
+        Async[F].delay(inStream.close()).handleErrorWith(_ => Async[F].unit)
       }
     }
 
-  def outputStream[F[_]: Sync](f: File, guard: Semaphore[F]): Resource[F, FileOutputStream] =
+  def outputStream[F[_]: Async](f: File, guard: Semaphore[F]): Resource[F, FileOutputStream] =
     Resource.make {
-      Sync[F].delay(new FileOutputStream(f))
+      Async[F].delay(new FileOutputStream(f))
     } { outStream =>
-      guard.withPermit {
-        Sync[F].delay(outStream.close()).handleErrorWith(_ => Sync[F].unit)
+      guard.permit.use { _ =>
+        Async[F].delay(outStream.close()).handleErrorWith(_ => Async[F].unit)
       }
     }
 
-  def inputOutputStreams[F[_]: Sync](in: File, out: File, guard: Semaphore[F]): Resource[F, (InputStream, OutputStream)] =
+  def inputOutputStreams[F[_]: Async](in: File, out: File, guard: Semaphore[F]): Resource[F, (InputStream, OutputStream)] =
     for {
       inStream  <- inputStream(in, guard)
       outStream <- outputStream(out, guard)
     } yield (inStream, outStream)
 
-  def copy[F[_]: Concurrent](origin: File, destination: File): F[Long] =
+  def copy[F[_]: Async](origin: File, destination: File): F[Long] =
     for {
       guard <- Semaphore[F](1)
       count <- inputOutputStreams(origin, destination, guard).use { case (in, out) =>
-                 guard.withPermit(transfer(in, out))
+                 guard.permit.use(_ => transfer(in, out))
                }
     } yield count
 

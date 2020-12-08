@@ -15,8 +15,7 @@
  */
 package catseffecttutorial.producerconsumer
 
-import cats.effect.concurrent.{Deferred, Ref}
-import cats.effect.{Concurrent, ContextShift, ExitCode, IO, IOApp, Sync}
+import cats.effect.{Async, Deferred, ExitCode, IO, IOApp, Ref}
 import cats.instances.list._
 import cats.syntax.all._
 
@@ -38,7 +37,7 @@ object ProducerConsumerBounded extends IOApp {
   }
 
 
-  def producer[F[_]: Concurrent: ContextShift](id: Int, counterR: Ref[F, Int], stateR: Ref[F, State[F,Int]]): F[Unit] = {
+  def producer[F[_]: Async](id: Int, counterR: Ref[F, Int], stateR: Ref[F, State[F,Int]]): F[Unit] = {
 
     def offer(i: Int): F[Unit] =
       Deferred[F, Unit].flatMap[Unit]{ offerer =>
@@ -47,7 +46,7 @@ object ProducerConsumerBounded extends IOApp {
             val (taker, rest) = takers.dequeue
             State(queue, capacity, rest, offerers) -> taker.complete(i).void
           case State(queue, capacity, takers, offerers) if queue.size < capacity =>
-            State(queue.enqueue(i), capacity, takers, offerers) -> Sync[F].unit
+            State(queue.enqueue(i), capacity, takers, offerers) -> Async[F].unit
           case State(queue, capacity, takers, offerers) =>
             State(queue, capacity, takers, offerers.enqueue(i -> offerer)) -> offerer.get
         }.flatten
@@ -56,19 +55,18 @@ object ProducerConsumerBounded extends IOApp {
     (for {
       i <- counterR.getAndUpdate(_ + 1)
       _ <- offer(i)
-      _ <- if(i % 10000 == 0) Sync[F].delay(println(s"Producer $id has reached $i items")) else Sync[F].unit
-      _ <- ContextShift[F].shift
+      _ <- if(i % 10000 == 0) Async[F].delay(println(s"Producer $id has reached $i items")) else Async[F].unit
     } yield ()) >> producer(id, counterR, stateR)
   }
 
-  def consumer[F[_]: Concurrent: ContextShift](id: Int, stateR: Ref[F, State[F, Int]]): F[Unit] = {
+  def consumer[F[_]: Async](id: Int, stateR: Ref[F, State[F, Int]]): F[Unit] = {
 
     val take: F[Int] =
       Deferred[F, Int].flatMap { taker =>
         stateR.modify {
           case State(queue, capacity, takers, offerers) if queue.nonEmpty && offerers.isEmpty =>
             val (i, rest) = queue.dequeue
-            State(rest, capacity, takers, offerers) -> Sync[F].pure(i)
+            State(rest, capacity, takers, offerers) -> Async[F].pure(i)
           case State(queue, capacity, takers, offerers) if queue.nonEmpty =>
             val (i, rest) = queue.dequeue
             val ((move, release), tail) = offerers.dequeue
@@ -83,8 +81,7 @@ object ProducerConsumerBounded extends IOApp {
 
     (for {
       i <- take
-      _ <- if(i % 10000 == 0) Sync[F].delay(println(s"Consumer $id has reached $i items")) else Sync[F].unit
-      _ <- ContextShift[F].shift
+      _ <- if(i % 10000 == 0) Async[F].delay(println(s"Consumer $id has reached $i items")) else Async[F].unit
     } yield ()) >> consumer(id, stateR)
   }
 

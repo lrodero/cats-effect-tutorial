@@ -15,8 +15,7 @@
  */
 package catseffecttutorial.producerconsumer
 
-import cats.effect.concurrent.{Deferred, Ref}
-import cats.effect.{Concurrent, ContextShift, ExitCode, IO, IOApp, Sync}
+import cats.effect.{Async, Deferred, ExitCode, IO, IOApp, Ref, Sync}
 import cats.instances.list._
 import cats.syntax.all._
 
@@ -37,7 +36,7 @@ object ProducerConsumer extends IOApp {
     def empty[F[_], A]: State[F, A] = State(Queue.empty, Queue.empty)
   }
 
-  def producer[F[_]: Sync: ContextShift](id: Int, counterR: Ref[F, Int], stateR: Ref[F, State[F,Int]]): F[Unit] = {
+  def producer[F[_]: Sync](id: Int, counterR: Ref[F, Int], stateR: Ref[F, State[F,Int]]): F[Unit] = {
 
     def offer(i: Int): F[Unit] =
       stateR.modify {
@@ -52,18 +51,17 @@ object ProducerConsumer extends IOApp {
       i <- counterR.getAndUpdate(_ + 1)
       _ <- offer(i)
       _ <- if(i % 10000 == 0) Sync[F].delay(println(s"Producer $id has reached $i items")) else Sync[F].unit
-      _ <- ContextShift[F].shift
     } yield ()) >> producer(id, counterR, stateR)
   }
 
-  def consumer[F[_]: Concurrent: ContextShift](id: Int, stateR: Ref[F, State[F, Int]]): F[Unit] = {
+  def consumer[F[_]: Async](id: Int, stateR: Ref[F, State[F, Int]]): F[Unit] = {
 
     val take: F[Int] =
       Deferred[F, Int].flatMap { taker =>
         stateR.modify {
           case State(queue, takers) if queue.nonEmpty =>
             val (i, rest) = queue.dequeue
-            State(rest, takers) -> Sync[F].pure(i)
+            State(rest, takers) -> Async[F].pure(i)
           case State(queue, takers) =>
             State(queue, takers.enqueue(taker)) -> taker.get
         }.flatten
@@ -71,8 +69,7 @@ object ProducerConsumer extends IOApp {
 
     (for {
       i <- take
-      _ <- if(i % 10000 == 0) Sync[F].delay(println(s"Consumer $id has reached $i items")) else Sync[F].unit
-      _ <- ContextShift[F].shift
+      _ <- if(i % 10000 == 0) Async[F].delay(println(s"Consumer $id has reached $i items")) else Async[F].unit
     } yield ()) >> consumer(id, stateR)
   }
 

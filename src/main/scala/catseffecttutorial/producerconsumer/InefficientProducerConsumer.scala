@@ -15,8 +15,7 @@
  */
 package catseffecttutorial.producerconsumer
 
-import cats.effect.{ContextShift, ExitCode, IO, IOApp, Sync}
-import cats.effect.concurrent.Ref
+import cats.effect.{ExitCode, IO, IOApp, Ref, Sync}
 import cats.syntax.all._
 
 import collection.immutable.Queue
@@ -28,21 +27,19 @@ import collection.immutable.Queue
  */
 object InefficientProducerConsumer extends IOApp {
 
-  def producer[F[_]: Sync: ContextShift](queueR: Ref[F, Queue[Int]], counter: Int): F[Unit] =
+  def producer[F[_]: Sync](queueR: Ref[F, Queue[Int]], counter: Int): F[Unit] =
     (for {
       _ <- if(counter % 10000 == 0) Sync[F].delay(println(s"Produced $counter items")) else Sync[F].unit
       _ <- queueR.getAndUpdate(_.enqueue(counter + 1))
-      _ <- ContextShift[F].shift
     } yield ()) >> producer(queueR, counter + 1)
 
-  def consumer[F[_] : Sync: ContextShift](queueR: Ref[F, Queue[Int]]): F[Unit] =
+  def consumer[F[_] : Sync](queueR: Ref[F, Queue[Int]]): F[Unit] =
     (for {
       iO <- queueR.modify{ queue =>
         queue.dequeueOption.fold((queue, Option.empty[Int])){case (i,queue) => (queue, Option(i))}
       }
       _ <- if(iO.exists(_ % 10000 == 0)) Sync[F].delay(println(s"Consumed ${iO.get} items"))
         else Sync[F].unit
-      _ <- ContextShift[F].shift
     } yield ()) >> consumer(queueR)
 
   override def run(args: List[String]): IO[ExitCode] =

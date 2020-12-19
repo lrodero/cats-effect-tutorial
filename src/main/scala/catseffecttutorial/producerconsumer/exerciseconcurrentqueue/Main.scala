@@ -1,9 +1,9 @@
 /*
- * Copyright 2020 Typelevel
+ * Copyright (c) 2020 Luis Rodero-Merino
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * You may obtain a copy of the License at.
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -13,14 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package catseffecttutorial.producerconsumer.exerciseconcurrentqueue
 
-import cats.effect.std.Queue
 import cats.effect.{ExitCode, IO, IOApp, Ref}
 import cats.syntax.all._
 
-object MainQueue extends IOApp {
+
+/**
+ * Multiple producer - multiple consumer system using a bounded concurrent queue able to
+ * handle cancellation.
+ *
+ * Second part of cats-effect tutorial at https://typelevel.org/cats-effect/tutorial/tutorial.html
+ */
+object Main extends IOApp {
 
   def producer(id: Int, counterR: Ref[IO, Int], queue: Queue[IO, Int]): IO[Unit] =
     (for {
@@ -35,10 +40,9 @@ object MainQueue extends IOApp {
       _ <- if(i % 10000 == 0) IO(println(s"Consumer $id has reached $i items")) else IO.unit
     } yield ()) >> consumer(id, queue)
 
-
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      queue <- Queue.bounded[IO, Int](100)
+      queue <- Queue[IO, Int](100)
       counterR <- Ref.of[IO, Int](1)
       producers = List.range(1, 11).map(producer(_, counterR, queue)) // 10 producers
       consumers = List.range(1, 11).map(consumer(_, queue))           // 10 consumers

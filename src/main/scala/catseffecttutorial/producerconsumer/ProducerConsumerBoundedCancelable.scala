@@ -23,7 +23,8 @@ import cats.effect.syntax.all._
 import scala.collection.immutable.Queue
 
 /**
- * Multiple producer - multiple consumer system using a bounded concurrent queue.
+ * Multiple producer - multiple consumer system using a bounded concurrent queue able to
+ * handle cancellation.
  *
  * Second part of cats-effect tutorial at https://typelevel.org/cats-effect/tutorial/tutorial.html
  *

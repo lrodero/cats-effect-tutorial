@@ -11,6 +11,7 @@ target/
 lib_managed/
 src_managed/
 project/target/
+project/project/
 project/boot/
 project/plugins/project/
 
@@ -24,3 +25,10 @@ project/plugins/project/
 # Ensime specific
 .ensime
 .ensime_cache/
+
+# Metals specific
+.metals/
+project/metals.sbt
+.bloop/
+.bsp/
+

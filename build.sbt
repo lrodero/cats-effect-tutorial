@@ -1,10 +1,10 @@
 name := "cats-effect-tutorial"
 
-version := "3.3.0-M4"
+version := "3.3.0-M5"
 
 scalaVersion := "2.13.3"
 
-libraryDependencies += "org.typelevel" %% "cats-effect" % "3.0.0-M4" withSources() withJavadoc()
+libraryDependencies += "org.typelevel" %% "cats-effect" % "3.0.0-M5" withSources() withJavadoc()
 
 scalacOptions ++= Seq(
   "-feature",

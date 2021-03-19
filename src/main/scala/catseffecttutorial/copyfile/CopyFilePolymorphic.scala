@@ -41,25 +41,25 @@ object CopyFilePolymorphic extends IOApp {
       total  <- transmit(origin, destination, buffer, 0L)
     } yield total
 
-  def inputStream[F[_]: Async](f: File, guard: Semaphore[F]): Resource[F, FileInputStream] =
+  def inputStream[F[_]: Sync](f: File, guard: Semaphore[F]): Resource[F, FileInputStream] =
     Resource.make {
-      Async[F].delay(new FileInputStream(f))
+      Sync[F].delay(new FileInputStream(f))
     } { inStream =>
       guard.permit.use { _ =>
-        Async[F].delay(inStream.close()).handleErrorWith(_ => Async[F].unit)
+        Sync[F].delay(inStream.close()).handleErrorWith(_ => Sync[F].unit)
       }
     }
 
-  def outputStream[F[_]: Async](f: File, guard: Semaphore[F]): Resource[F, FileOutputStream] =
+  def outputStream[F[_]: Sync](f: File, guard: Semaphore[F]): Resource[F, FileOutputStream] =
     Resource.make {
-      Async[F].delay(new FileOutputStream(f))
+      Sync[F].delay(new FileOutputStream(f))
     } { outStream =>
       guard.permit.use { _ =>
-        Async[F].delay(outStream.close()).handleErrorWith(_ => Async[F].unit)
+        Sync[F].delay(outStream.close()).handleErrorWith(_ => Sync[F].unit)
       }
     }
 
-  def inputOutputStreams[F[_]: Async](in: File, out: File, guard: Semaphore[F]): Resource[F, (InputStream, OutputStream)] =
+  def inputOutputStreams[F[_]: Sync](in: File, out: File, guard: Semaphore[F]): Resource[F, (InputStream, OutputStream)] =
     for {
       inStream  <- inputStream(in, guard)
       outStream <- outputStream(out, guard)

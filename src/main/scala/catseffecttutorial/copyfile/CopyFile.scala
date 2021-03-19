@@ -75,6 +75,7 @@ object CopyFile extends IOApp {
       }
     } yield count
 
+  private val console = IO.consoleForIO
   override def run(args: List[String]): IO[ExitCode] =
     (for {
       _ <- if (args.length < 2) IO.raiseError(new IllegalArgumentException("Need origin and destination files"))
@@ -82,9 +83,9 @@ object CopyFile extends IOApp {
       orig = new File(args.head)
       dest = new File(args.tail.head)
       count <- copy(orig, dest)
-      _ <- IO(println(s"$count bytes copied from ${orig.getPath} to ${dest.getPath}"))
+      _ <- console.println(s"$count bytes copied from ${orig.getPath} to ${dest.getPath}")
     } yield ExitCode.Success).handleErrorWith{ t =>
-      IO(t.printStackTrace()).as(ExitCode.Error)
+      console.errorln(t).as(ExitCode.Error)
     }
 
 }

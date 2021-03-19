@@ -27,17 +27,19 @@ import cats.syntax.all._
  */
 object Main extends IOApp {
 
+  private val console = IO.consoleForIO
+
   def producer(id: Int, counterR: Ref[IO, Int], queue: Queue[IO, Int]): IO[Unit] =
     (for {
       i <- counterR.getAndUpdate(_ + 1)
       _ <- queue.offer(i)
-      _ <- if(i % 10000 == 0) IO(println(s"Producer $id has reached $i items")) else IO.unit
+      _ <- if(i % 10000 == 0) console.println(s"Producer $id has reached $i items") else IO.unit
     } yield ()) >> producer(id, counterR, queue)
 
   def consumer(id: Int, queue: Queue[IO, Int]): IO[Unit] =
     (for {
       i <- queue.take
-      _ <- if(i % 10000 == 0) IO(println(s"Consumer $id has reached $i items")) else IO.unit
+      _ <- if(i % 10000 == 0) console.println(s"Consumer $id has reached $i items") else IO.unit
     } yield ()) >> consumer(id, queue)
 
   override def run(args: List[String]): IO[ExitCode] =
@@ -49,7 +51,7 @@ object Main extends IOApp {
       res <- (producers ++ consumers)
         .parSequence.as(ExitCode.Success) // Run producers and consumers in parallel until done (likely by user cancelling with CTRL-C)
         .handleErrorWith { t =>
-          IO(println(s"Error caught: ${t.getMessage}")).as(ExitCode.Error)
+          console.errorln(s"Error caught: ${t.getMessage}").as(ExitCode.Error)
         }
     } yield res
 }

@@ -16,6 +16,7 @@
 package catseffecttutorial.producerconsumer
 
 import cats.effect.{Async, Deferred, ExitCode, IO, IOApp, Ref}
+import cats.effect.std.Console
 import cats.instances.list._
 import cats.syntax.all._
 
@@ -37,7 +38,7 @@ object ProducerConsumerBounded extends IOApp {
   }
 
 
-  def producer[F[_]: Async](id: Int, counterR: Ref[F, Int], stateR: Ref[F, State[F,Int]]): F[Unit] = {
+  def producer[F[_]: Async: Console](id: Int, counterR: Ref[F, Int], stateR: Ref[F, State[F,Int]]): F[Unit] = {
 
     def offer(i: Int): F[Unit] =
       Deferred[F, Unit].flatMap[Unit]{ offerer =>
@@ -55,11 +56,11 @@ object ProducerConsumerBounded extends IOApp {
     (for {
       i <- counterR.getAndUpdate(_ + 1)
       _ <- offer(i)
-      _ <- if(i % 10000 == 0) Async[F].delay(println(s"Producer $id has reached $i items")) else Async[F].unit
+      _ <- if(i % 10000 == 0) Console[F].println(s"Producer $id has reached $i items") else Async[F].unit
     } yield ()) >> producer(id, counterR, stateR)
   }
 
-  def consumer[F[_]: Async](id: Int, stateR: Ref[F, State[F, Int]]): F[Unit] = {
+  def consumer[F[_]: Async: Console](id: Int, stateR: Ref[F, State[F, Int]]): F[Unit] = {
 
     val take: F[Int] =
       Deferred[F, Int].flatMap { taker =>
@@ -81,7 +82,7 @@ object ProducerConsumerBounded extends IOApp {
 
     (for {
       i <- take
-      _ <- if(i % 10000 == 0) Async[F].delay(println(s"Consumer $id has reached $i items")) else Async[F].unit
+      _ <- if(i % 10000 == 0) Console[F].println(s"Consumer $id has reached $i items") else Async[F].unit
     } yield ()) >> consumer(id, stateR)
   }
 
@@ -94,7 +95,7 @@ object ProducerConsumerBounded extends IOApp {
       res <- (producers ++ consumers)
         .parSequence.as(ExitCode.Success) // Run producers and consumers in parallel until done (likely by user cancelling with CTRL-C)
         .handleErrorWith { t =>
-          IO(println(s"Error caught: ${t.getMessage}")).as(ExitCode.Error)
+          Console[IO].errorln(s"Error caught: ${t.getMessage}").as(ExitCode.Error)
         }
     } yield res
 }

@@ -28,8 +28,8 @@ object CopyFile extends IOApp {
 
   def transmit(origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): IO[Long] =
     for {
-      amount <- IO(origin.read(buffer, 0, buffer.length))
-      count <- if (amount > -1) IO(destination.write(buffer, 0, amount)) >> transmit(origin, destination, buffer, acc + amount)
+      amount <- IO.blocking(origin.read(buffer, 0, buffer.length))
+      count <- if (amount > -1) IO.blocking(destination.write(buffer, 0, amount)) >> transmit(origin, destination, buffer, acc + amount)
       else IO.pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
     } yield count // Returns the actual amount of bytes transmitted
 

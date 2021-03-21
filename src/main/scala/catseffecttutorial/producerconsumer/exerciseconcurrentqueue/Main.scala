@@ -30,17 +30,19 @@ object Main extends IOApp {
   private val console = IO.consoleForIO
 
   def producer(id: Int, counterR: Ref[IO, Int], queue: Queue[IO, Int]): IO[Unit] =
-    (for {
+    for {
       i <- counterR.getAndUpdate(_ + 1)
       _ <- queue.offer(i)
       _ <- if(i % 10000 == 0) console.println(s"Producer $id has reached $i items") else IO.unit
-    } yield ()) >> producer(id, counterR, queue)
+      _ <- producer(id, counterR, queue)
+    } yield ()
 
   def consumer(id: Int, queue: Queue[IO, Int]): IO[Unit] =
-    (for {
+    for {
       i <- queue.take
       _ <- if(i % 10000 == 0) console.println(s"Consumer $id has reached $i items") else IO.unit
-    } yield ()) >> consumer(id, queue)
+      _ <- consumer(id, queue)
+    } yield ()
 
   override def run(args: List[String]): IO[ExitCode] =
     for {

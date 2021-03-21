@@ -53,11 +53,12 @@ object ProducerConsumerBounded extends IOApp {
         }.flatten
       }
 
-    (for {
+    for {
       i <- counterR.getAndUpdate(_ + 1)
       _ <- offer(i)
       _ <- if(i % 10000 == 0) Console[F].println(s"Producer $id has reached $i items") else Async[F].unit
-    } yield ()) >> producer(id, counterR, stateR)
+      _ <- producer(id, counterR, stateR)
+    } yield ()
   }
 
   def consumer[F[_]: Async: Console](id: Int, stateR: Ref[F, State[F, Int]]): F[Unit] = {
@@ -80,10 +81,11 @@ object ProducerConsumerBounded extends IOApp {
         }.flatten
       }
 
-    (for {
+    for {
       i <- take
       _ <- if(i % 10000 == 0) Console[F].println(s"Consumer $id has reached $i items") else Async[F].unit
-    } yield ()) >> consumer(id, stateR)
+      _ <- consumer(id, stateR)
+    } yield ()
   }
 
   override def run(args: List[String]): IO[ExitCode] =

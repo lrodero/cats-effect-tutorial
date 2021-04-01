@@ -2,7 +2,7 @@ cats-effect-tutorial
 ====================
 
 Source code of the examples/exercises of [cats-effect
-tutorial](https://lrodero.github.io/cats-effect/tutorial/tutorial.html).
+tutorial](https://typelevel.org/cats-effect/docs/tutorial).
 
 All contents released under the [Apache v2 license](https://www.apache.org/licenses/LICENSE-2.0).
 

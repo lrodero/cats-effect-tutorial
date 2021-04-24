@@ -15,8 +15,7 @@
  */
 package catseffecttutorial.copyfile
 
-import cats.effect.{ExitCode, IO, IOApp, Resource}
-import cats.effect.std.Semaphore
+import cats.effect._
 
 import java.io._
 
@@ -34,46 +33,32 @@ object CopyFile extends IOApp {
     } yield count // Returns the actual amount of bytes transmitted
 
   def transfer(origin: InputStream, destination: OutputStream): IO[Long] =
-    for {
-      buffer <- IO {
-        new Array[Byte](1024 * 10)
-      } // Allocated only when the IO is evaluated
-      total <- transmit(origin, destination, buffer, 0L)
-    } yield total
+    transmit(origin, destination, new Array[Byte](1024 * 10), 0L)
 
-  def inputStream(f: File, guard: Semaphore[IO]): Resource[IO, FileInputStream] =
+  def inputStream(f: File): Resource[IO, FileInputStream] =
     Resource.make {
-      IO(new FileInputStream(f))
+      IO.blocking(new FileInputStream(f))
     } { inStream =>
-      guard.permit.use { _ =>
-        IO(inStream.close()).handleErrorWith(_ => IO.unit)
-      }
+      IO.blocking(inStream.close()).handleErrorWith(_ => IO.unit)
     }
 
-  def outputStream(f: File, guard: Semaphore[IO]): Resource[IO, FileOutputStream] =
+  def outputStream(f: File): Resource[IO, FileOutputStream] =
     Resource.make {
-      IO(new FileOutputStream(f))
+      IO.blocking(new FileOutputStream(f))
     } { outStream =>
-      guard.permit.use{ _ =>
-        IO(outStream.close()).handleErrorWith(_ => IO.unit)
-      }
+      IO.blocking(outStream.close()).handleErrorWith(_ => IO.unit)
     }
 
-  def inputOutputStreams(in: File, out: File, guard: Semaphore[IO]): Resource[IO, (InputStream, OutputStream)] =
+  def inputOutputStreams(in: File, out: File): Resource[IO, (InputStream, OutputStream)] =
     for {
-      inStream <- inputStream(in, guard)
-      outStream <- outputStream(out, guard)
+      inStream <- inputStream(in)
+      outStream <- outputStream(out)
     } yield (inStream, outStream)
 
   def copy(origin: File, destination: File): IO[Long] =
-    for {
-      guard <- Semaphore[IO](1)
-      count <- inputOutputStreams(origin, destination, guard).use { case (in, out) =>
-        guard.permit.use { _ =>
-          transfer(in, out)
-        }
-      }
-    } yield count
+    inputOutputStreams(origin, destination).use { case (in, out) =>
+      transfer(in, out)
+    }
 
   override def run(args: List[String]): IO[ExitCode] =
     for {

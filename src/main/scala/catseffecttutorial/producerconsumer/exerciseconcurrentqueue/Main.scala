@@ -33,14 +33,14 @@ object Main extends IOApp {
     for {
       i <- counterR.getAndUpdate(_ + 1)
       _ <- queue.offer(i)
-      _ <- if(i % 10000 == 0) console.println(s"Producer $id has reached $i items") else IO.unit
+      _ <- IO.whenA(i % 10000 == 0)(console.println(s"Producer $id has reached $i items"))
       _ <- producer(id, counterR, queue)
     } yield ()
 
   def consumer(id: Int, queue: Queue[IO, Int]): IO[Unit] =
     for {
       i <- queue.take
-      _ <- if(i % 10000 == 0) console.println(s"Consumer $id has reached $i items") else IO.unit
+      _ <- IO.whenA(i % 10000 == 0)(console.println(s"Consumer $id has reached $i items"))
       _ <- consumer(id, queue)
     } yield ()
 

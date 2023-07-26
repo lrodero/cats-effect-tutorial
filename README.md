@@ -15,9 +15,9 @@ $ sbt
 ```
 
 Any of the files can be executed also using `sbt`. So for example to run
-`catsEffectTutorial.copyfile.CopyFile` to copy an `origin.txt` file to another
+`catseffecttutorial.copyfile.CopyFile` to copy an `origin.txt` file to another
 `destination.txt` file we will run:
 ```bash
 $ sbt
-> runMain catsEffectTutorial.copyfile.CopyFile origin.txt destination.txt
+> runMain catseffecttutorial.copyfile.CopyFile origin.txt destination.txt
 ```

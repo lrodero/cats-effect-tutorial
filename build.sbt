@@ -1,13 +1,16 @@
 name := "cats-effect-tutorial"
 
-version := "3.2.9"
+val ceVersion = "3.5.1"
 
-scalaVersion := "2.13.6"
+version := ceVersion
 
-libraryDependencies += "org.typelevel" %% "cats-effect" % "3.2.9" withSources() withJavadoc()
+scalaVersion := "2.13.11"
+
+libraryDependencies += "org.typelevel" %% "cats-effect" % ceVersion withSources() withJavadoc()
 
 scalacOptions ++= Seq(
   "-feature",
   "-deprecation",
   "-unchecked",
-  "-language:postfixOps")
+  "-language:postfixOps"
+)

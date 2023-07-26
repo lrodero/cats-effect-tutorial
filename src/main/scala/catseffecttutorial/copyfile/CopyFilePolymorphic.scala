@@ -27,15 +27,12 @@ import java.io._
  */
 object CopyFilePolymorphic extends IOApp {
 
-  def transmit[F[_]: Sync](origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): F[Long] =
+  def transfer[F[_]: Sync](origin: InputStream, destination: OutputStream, buffer: Array[Byte], acc: Long): F[Long] =
     for {
       amount <- Sync[F].blocking(origin.read(buffer, 0, buffer.length))
-      count  <- if(amount > -1) Sync[F].blocking(destination.write(buffer, 0, amount)) >> transmit(origin, destination, buffer, acc + amount)
+      count  <- if(amount > -1) Sync[F].blocking(destination.write(buffer, 0, amount)) >> transfer(origin, destination, buffer, acc + amount)
                 else Sync[F].pure(acc) // End of read stream reached (by java.io.InputStream contract), nothing to write
-    } yield count // Returns the actual amount of bytes transmitted
-
-  def transfer[F[_]: Sync](origin: InputStream, destination: OutputStream): F[Long] =
-    transmit(origin, destination, new Array[Byte](1024 * 10), 0L)
+    } yield count // Returns the actual amount of bytes transferred
 
   def inputStream[F[_]: Sync](f: File): Resource[F, FileInputStream] =
     Resource.make {
@@ -59,13 +56,12 @@ object CopyFilePolymorphic extends IOApp {
 
   def copy[F[_]: Sync](origin: File, destination: File): F[Long] =
     inputOutputStreams(origin, destination).use { case (in, out) =>
-      transfer(in, out)
+      transfer(in, out, new Array[Byte](1024 * 10), 0L)
     }
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      _      <- if(args.length < 2) IO.raiseError(new IllegalArgumentException("Need origin and destination files"))
-                else IO.unit
+      _ <- IO.raiseWhen(args.length < 2)(new IllegalArgumentException("Need origin and destination files"))
       orig = new File(args.head)
       dest = new File(args.tail.head)
       count <- copy[IO](orig, dest)

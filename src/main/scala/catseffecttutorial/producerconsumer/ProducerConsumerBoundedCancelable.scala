@@ -60,7 +60,7 @@ object ProducerConsumerBoundedCancelable extends IOApp {
     for {
       i <- counterR.getAndUpdate(_ + 1)
       _ <- offer(i)
-      _ <- if(i % 10000 == 0) Console[F].println(s"Producer $id has reached $i items") else Async[F].unit
+      _ <- Async[F].whenA(i % 100000 == 0)(Console[F].println(s"Producer $id has reached $i items"))
       _ <- producer(id, counterR, stateR)
     } yield ()
   }
@@ -90,7 +90,7 @@ object ProducerConsumerBoundedCancelable extends IOApp {
 
     for {
       i <- take
-      _ <- if(i % 10000 == 0) Console[F].println(s"Consumer $id has reached $i items") else Async[F].unit
+      _ <- Async[F].whenA(i % 100000 == 0)(Console[F].println(s"Consumer $id has reached $i items"))
       _ <- consumer(id, stateR)
     } yield ()
   }

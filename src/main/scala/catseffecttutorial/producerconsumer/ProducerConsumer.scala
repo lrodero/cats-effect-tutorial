@@ -15,12 +15,13 @@
  */
 package catseffecttutorial.producerconsumer
 
-import cats.effect.{Async, Deferred, ExitCode, IO, IOApp, Ref, Sync}
+import cats.effect._
 import cats.effect.std.Console
 import cats.instances.list._
 import cats.syntax.all._
 
 import scala.collection.immutable.Queue
+import scala.concurrent.duration.DurationInt
 
 /**
  * Multiple producer - multiple consumer system using an unbounded concurrent queue.
@@ -37,7 +38,7 @@ object ProducerConsumer extends IOApp {
     def empty[F[_], A]: State[F, A] = State(Queue.empty, Queue.empty)
   }
 
-  def producer[F[_]: Sync: Console](id: Int, counterR: Ref[F, Int], stateR: Ref[F, State[F,Int]]): F[Unit] = {
+  def producer[F[_]: Async: Console](id: Int, counterR: Ref[F, Int], stateR: Ref[F, State[F,Int]]): F[Unit] = {
 
     def offer(i: Int): F[Unit] =
       stateR.modify {
@@ -51,7 +52,8 @@ object ProducerConsumer extends IOApp {
     for {
       i <- counterR.getAndUpdate(_ + 1)
       _ <- offer(i)
-      _ <- if(i % 10000 == 0) Console[F].println(s"Producer $id has reached $i items") else Sync[F].unit
+      _ <- Async[F].whenA(i % 100000 == 0)(Console[F].println(s"Producer $id has reached $i items"))
+      _ <- Async[F].sleep(1.microsecond) // To prevent overwhelming consumers
       _ <- producer(id, counterR, stateR)
     } yield ()
   }
@@ -71,7 +73,7 @@ object ProducerConsumer extends IOApp {
 
     for {
       i <- take
-      _ <- if(i % 10000 == 0) Console[F].println(s"Consumer $id has reached $i items") else Async[F].unit
+      _ <- Async[F].whenA(i % 10000 == 0)(Console[F].println(s"Consumer $id has reached $i items"))
       _ <- consumer(id, stateR)
     } yield ()
   }

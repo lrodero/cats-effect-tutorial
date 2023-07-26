@@ -15,11 +15,12 @@
  */
 package catseffecttutorial.producerconsumer
 
-import cats.effect.{ExitCode, IO, IOApp, Ref, Sync}
+import cats.effect.{Async, ExitCode, IO, IOApp, Ref, Sync}
 import cats.effect.std.Console
 import cats.syntax.all._
 
-import collection.immutable.Queue
+import scala.collection.immutable.Queue
+import scala.concurrent.duration.DurationInt
 
 /**
  * Single producer - single consumer system using an unbounded concurrent queue.
@@ -28,9 +29,10 @@ import collection.immutable.Queue
  */
 object InefficientProducerConsumer extends IOApp {
 
-  def producer[F[_]: Sync: Console](queueR: Ref[F, Queue[Int]], counter: Int): F[Unit] =
+  def producer[F[_]: Async: Console](queueR: Ref[F, Queue[Int]], counter: Int): F[Unit] =
     for {
-      _ <- if(counter % 10000 == 0) Console[F].println(s"Produced $counter items") else Sync[F].unit
+      _ <- Async[F].whenA(counter % 10000 == 0)(Console[F].println(s"Produced $counter items"))
+      _ <- Async[F].sleep(1.microsecond) // To prevent overwhelming consumers
       _ <- queueR.getAndUpdate(_.enqueue(counter + 1))
       _ <- producer(queueR, counter + 1)
     } yield ()
@@ -40,8 +42,7 @@ object InefficientProducerConsumer extends IOApp {
       iO <- queueR.modify{ queue =>
         queue.dequeueOption.fold((queue, Option.empty[Int])){case (i,queue) => (queue, Option(i))}
       }
-      _ <- if(iO.exists(_ % 10000 == 0)) Console[F].println(s"Consumed ${iO.get} items")
-        else Sync[F].unit
+      _ <- Sync[F].whenA(iO.exists(_ % 10000 == 0))(Console[F].println(s"Consumed ${iO.get} items"))
       _ <- consumer(queueR)
     } yield ()
 
